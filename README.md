@@ -9,7 +9,7 @@ We will use a conda environment.
 
 2. Make sure conda is on `$PATH`. Do something like [export path](https://stackoverflow.com/a/35246794).
 
-3. `conda create --name env python=3.9`.
+3. `conda create --name env python=3.8`.
 
 4. Activate environment with `conda activate env`.
 
