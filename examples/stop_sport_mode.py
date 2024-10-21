@@ -1,5 +1,5 @@
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-import utils.client_utils as client_utils
+import client_utils as client_utils
 
 import sys
 
@@ -11,4 +11,4 @@ if __name__ == "__main__":
 
     rsc = client_utils.get_robot_state_client()
     client_utils.print_service_list(rsc)
-    client_utils.set_service("sport_mode", False)
+    client_utils.set_service(rsc, "sport_mode", False)

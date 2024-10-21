@@ -24,7 +24,7 @@ crc = CRC()
 joint_state_log = []
 
 def read_joints(msg: LowState_):
-    joint_state_log.append(time.time(), msg.motor_state)
+    joint_state_log.append((time.time(), msg.motor_state))
 
 if __name__ == '__main__':
 
@@ -59,14 +59,14 @@ if __name__ == '__main__':
     # tuple with current time and joint commands
     joint_command_log = []
 
-    for i in range(10 * PUB_FREQ):
+    for i in range(10 * 300):
         current_time = time.time()
         sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time)
 
         # # Poinstion(rad) control, set RL_0 rad
         for name in ["RL_0", "RR_0", "FL_0", "FR_0"]:
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
-            if name == "RL_0":
+            if True: # name == "RL_0":
                 cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Taregt angular(rad)
             else:
                 cmd.motor_cmd[go2.LegID[name]].q = 0  # Taregt angular(rad)
@@ -80,7 +80,6 @@ if __name__ == '__main__':
         #Publish message
         if pub.Write(cmd):
             joint_command_log.append((time.time(), cmd.motor_cmd))
-            print("Publish success. msg:", cmd.crc)
         else:
             print("Waiting for subscriber.")
 
