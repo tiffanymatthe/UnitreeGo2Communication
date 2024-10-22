@@ -59,14 +59,14 @@ if __name__ == '__main__':
 
     # https://github.com/unitreerobotics/unitree_rl_gym/tree/main/resources/robots/go2/urdf
     # calf (2)
-    min_amp = -2.7227
-    max_amp = -0.83776
+    # min_amp = -2.7227
+    # max_amp = -0.83776
     # thigh (1)
     # min_amp = -1.5708
     # max_amp = 3.4907
     # hip (0)
-    # min_amp = -1.0472
-    # max_amp = 1.0472
+    min_amp = -1.0472
+    max_amp = 1.0472
     amplitude = (max_amp - min_amp) / 2
     offset = (max_amp + min_amp) / 2
 
@@ -82,8 +82,9 @@ if __name__ == '__main__':
         cmd.motor_cmd[go2.LegID[name]].kd = 1.0  # Position (rad) control kd gain
         cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
 
-    motors_to_control = ["RL_2", "RR_2", "FL_2", "FR_2"]
+    # motors_to_control = ["RL_2", "RR_2", "FL_2", "FR_2"]
     # motors_to_control = ["RL_1", "RR_1", "FL_1", "FR_1"]
+    motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
 
     # set everything not q
     for name in motors_to_control:
