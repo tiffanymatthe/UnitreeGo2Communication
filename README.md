@@ -13,7 +13,7 @@ We will use a conda environment.
 
 4. Activate environment with `conda activate env`.
 
-4. Install the forked [unitree_sdk2_python](git@github.com:tiffanymatthe/unitree_sdk2_python.git) when environment is activated.
+4. Install the forked [unitree_sdk2_python](https://github.com/tiffanymatthe/unitree_sdk2_python) when environment is activated by following the instructions below:
 
 ```
 cd ~
@@ -23,7 +23,13 @@ cd unitree_sdk2_python
 pip3 install -e .
 ```
 
-5. Install other packages.
+You will need to run `pip3 install -e .` again if you change files in the `unitree_sdk2_python` repository.
+
+Remember to `cd` back to this repository when running scripts.
+
+5. Install other packages. (None for the moment.)
+
+6. When running the scripts in examples, connect to the robot with an ethernet. First time connection requires setting up the network interface. See [network environment setup](https://support.unitree.com/home/en/developer/Quick_start) for details.
 
 ### Every time
 `conda activate env` to activate environment.
@@ -31,7 +37,8 @@ pip3 install -e .
 
 ## Telemetry Test
 
-Run all joints through a sinusoidal wave with `joint_pub_sub.py`. This will spawn two threads.
+1. `conda activate env`
+2. `python3 examples/stop_sport_mode.py enp...` where enp... is the ethernet name.
+3. Run all joints through a sinusoidal wave with `python3 examples/joint_pub_sub.py enp...`. This will create a pickle file of subscriber and publisher messages.
+4. Read them with `read_pkl.py`.
 
-1. Thread 1 will send joint positions to the robot through a publisher at 500 Hz. These commands will be logged.
-2. Thread 2 will read joint positions from the robot through a subscriber at 500 Hz. These readings will be logged.
