@@ -55,8 +55,11 @@ if __name__ == '__main__':
         cmd.motor_cmd[i].tau = 0
 
     freq = 1/8
-    min_amp = -2.7227
-    max_amp = -0.83776
+    # min_amp = -2.7227
+    # max_amp = -0.83776
+    # thigh
+    min_amp = -1.5708
+    max_amp = 3.4907
     amplitude = (max_amp - min_amp) / 2
     offset = (max_amp + min_amp) / 2
 
@@ -74,8 +77,8 @@ if __name__ == '__main__':
             cmd.motor_cmd[go2.LegID[name]].dq = 0.0  # Target angular velocity(rad/ss)
             cmd.motor_cmd[go2.LegID[name]].kd = 1.0  # Poinstion(rad) control kd gain
             cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
-        # for name in ["RL_1", "RR_1", "FL_1", "FR_1"]:
-        for name in ["RL_2", "RR_2", "FL_2", "FR_2"]:
+        for name in ["RL_1", "RR_1", "FL_1", "FR_1"]:
+        # for name in ["RL_2", "RR_2", "FL_2", "FR_2"]:
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
             if True: # name == "RL_0":
                 cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Target angular(rad)
