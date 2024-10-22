@@ -55,14 +55,17 @@ if __name__ == '__main__':
         cmd.motor_cmd[i].tau = 0
 
     freq = 1/8
-    amplitude = math.radians(30)
+    min_amp = -2.7227
+    max_amp = -0.83776
+    amplitude = (max_amp - min_amp) / 2
+    offset = (max_amp + min_amp) / 2
 
     # tuple with current time and joint commands
     joint_command_log = []
 
     for i in range(10 * 300):
         current_time = time.time()
-        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time) - math.radians(30+50)
+        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time) + offset
         # # Poinstion(rad) control, set RL_0 rad
         for name in ["RL_0", "RR_0", "FL_0", "FR_0"]:
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
