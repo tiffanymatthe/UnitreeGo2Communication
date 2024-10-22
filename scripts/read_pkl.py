@@ -10,7 +10,7 @@ if __name__ == "__main__":
     motors_to_plot = ["RL_0", "RR_0", "FL_0", "FR_0"]
 
     joint_command_times = [command[0] for command in joint_commands]
-    joint_command_q = [[command[1][LegID[motor_id]].q for motor_id in motors_to_plot] for command in joint_commands]
+    joint_command_q = [[command[1][LegID[motor_id]] for motor_id in motors_to_plot] for command in joint_commands]
 
     joint_state_times = [state[0] for state in joint_states]
     joint_state_q = [[state[1][LegID[motor_id]].q for motor_id in motors_to_plot] for state in joint_states]

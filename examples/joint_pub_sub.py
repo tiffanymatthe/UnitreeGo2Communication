@@ -11,7 +11,7 @@ from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowState_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import Thread
-import unitree_legged_const as go2
+import constants.unitree_legged_const as go2
 
 '''
 IMPORTANT: Turn off sport mode beforehand. Must suspend robot with harness.
@@ -62,12 +62,17 @@ if __name__ == '__main__':
 
     for i in range(10 * 300):
         current_time = time.time()
-        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time)
-
+        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time) - math.radians(55)
         # # Poinstion(rad) control, set RL_0 rad
         for name in ["RL_0", "RR_0", "FL_0", "FR_0"]:
+            cmd.motor_cmd[go2.LegID[name]].mode = 0x01
+            cmd.motor_cmd[go2.LegID[name]].q = 0
+            cmd.motor_cmd[go2.LegID[name]].kp = 10.0 # Poinstion(rad) control kp gain
+            cmd.motor_cmd[go2.LegID[name]].dq = 0.0  # Target angular velocity(rad/ss)
+            cmd.motor_cmd[go2.LegID[name]].kd = 1.0  # Poinstion(rad) control kd gain
+            cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
         # for name in ["RL_1", "RR_1", "FL_1", "FR_1"]:
-        # for name in ["RL_2", "RR_2", "FL_2", "FR_2"]:
+        for name in ["RL_2", "RR_2", "FL_2", "FR_2"]:
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
             if True: # name == "RL_0":
                 cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Target angular(rad)
@@ -82,7 +87,7 @@ if __name__ == '__main__':
 
         #Publish message
         if pub.Write(cmd):
-            joint_command_log.append((time.time(), copy.copy(cmd.motor_cmd)))
+            joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
         else:
             print("Waiting for subscriber.")
 
