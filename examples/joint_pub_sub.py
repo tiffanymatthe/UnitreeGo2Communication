@@ -2,6 +2,7 @@ import time
 import sys
 import math
 import pickle
+import copy
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
 from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
@@ -79,7 +80,7 @@ if __name__ == '__main__':
 
         #Publish message
         if pub.Write(cmd):
-            joint_command_log.append((time.time(), cmd.motor_cmd))
+            joint_command_log.append((time.time(), copy.copy(cmd.motor_cmd)))
         else:
             print("Waiting for subscriber.")
 
