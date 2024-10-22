@@ -55,20 +55,24 @@ if __name__ == '__main__':
         cmd.motor_cmd[i].kd = 0
         cmd.motor_cmd[i].tau = 0
 
-    freq = 1/8
-
     # https://github.com/unitreerobotics/unitree_rl_gym/tree/main/resources/robots/go2/urdf
     # calf (2)
     # min_amp = -2.7227
     # max_amp = -0.83776
     # thigh (1)
-    # min_amp = -1.5708
-    # max_amp = 3.4907
+    min_amp = -1.5708
+    max_amp = 3.4907
     # hip (0)
-    min_amp = -1.0472
-    max_amp = 1.0472
+    # min_amp = -1.0472
+    # max_amp = 1.0472
     amplitude = (max_amp - min_amp) / 2
     offset = (max_amp + min_amp) / 2
+
+    # adjusted to avoid large changes in angles
+    if amplitude > 2.0944:
+        freq = 1/8 * 2.0944/amplitude
+    else:
+        freq = 1/8
 
     # tuple with current time and joint commands
     joint_command_log = []
@@ -83,8 +87,8 @@ if __name__ == '__main__':
         cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
 
     # motors_to_control = ["RL_2", "RR_2", "FL_2", "FR_2"]
-    # motors_to_control = ["RL_1", "RR_1", "FL_1", "FR_1"]
-    motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
+    motors_to_control = ["RL_1"] #, "RR_1", "FL_1", "FR_1"]
+    # motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
 
     # set everything not q
     for name in motors_to_control:
@@ -122,5 +126,6 @@ if __name__ == '__main__':
     with open(log_file, 'wb') as f:
         pickle.dump(joint_command_log, f)
         pickle.dump(joint_state_log, f)
+        pickle.dump({"amplitude": amplitude, "offset": offset, "freq": freq})
 
     print(f"Saved to {log_file}")
