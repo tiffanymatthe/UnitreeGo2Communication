@@ -1,5 +1,5 @@
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-import client_utils as client_utils
+import utils.client_utils as client_utils
 
 import sys
 

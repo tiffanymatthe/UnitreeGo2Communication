@@ -38,7 +38,7 @@ Remember to `cd` back to this repository when running scripts.
 ## Telemetry Test
 
 1. `conda activate env`
-2. `python3 examples/stop_sport_mode.py enp...` where enp... is the ethernet name.
-3. Run all joints through a sinusoidal wave with `python3 examples/joint_pub_sub.py enp...`. This will create a pickle file of subscriber and publisher messages.
-4. Read them with `read_pkl.py`.
+2. `python3 -m examples.stop_sport_mode enp...` where enp... is the ethernet name.
+3. Run all joints through a sinusoidal wave with `python3 -m examples.joint_pub_sub enp...`. This will create a pickle file of subscriber and publisher messages.
+4. Read them with `python3 -m scripts.read_pkl`.
 

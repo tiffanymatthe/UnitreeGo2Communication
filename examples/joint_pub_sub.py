@@ -66,13 +66,15 @@ if __name__ == '__main__':
 
         # # Poinstion(rad) control, set RL_0 rad
         for name in ["RL_0", "RR_0", "FL_0", "FR_0"]:
+        # for name in ["RL_1", "RR_1", "FL_1", "FR_1"]:
+        # for name in ["RL_2", "RR_2", "FL_2", "FR_2"]:
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
             if True: # name == "RL_0":
-                cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Taregt angular(rad)
+                cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Target angular(rad)
             else:
-                cmd.motor_cmd[go2.LegID[name]].q = 0  # Taregt angular(rad)
+                cmd.motor_cmd[go2.LegID[name]].q = 0  # Target angular(rad)
             cmd.motor_cmd[go2.LegID[name]].kp = 10.0 # Poinstion(rad) control kp gain
-            cmd.motor_cmd[go2.LegID[name]].dq = 0.0  # Taregt angular velocity(rad/ss)
+            cmd.motor_cmd[go2.LegID[name]].dq = 0.0  # Target angular velocity(rad/ss)
             cmd.motor_cmd[go2.LegID[name]].kd = 1.0  # Poinstion(rad) control kd gain
             cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
         

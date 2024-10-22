@@ -1,6 +1,6 @@
 import pickle
 import matplotlib.pyplot as plt
-from examples.unitree_legged_const import LegID
+from constants.unitree_legged_const import LegID
 
 if __name__ == "__main__":
     with (open("sinusoidal_logs.pkl", "rb")) as openfile:
