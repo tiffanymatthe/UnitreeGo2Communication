@@ -55,14 +55,14 @@ if __name__ == '__main__':
         cmd.motor_cmd[i].tau = 0
 
     freq = 1/8
-    amplitude = math.radians(15)
+    amplitude = math.radians(30)
 
     # tuple with current time and joint commands
     joint_command_log = []
 
     for i in range(10 * 300):
         current_time = time.time()
-        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time) - math.radians(55)
+        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * current_time) - math.radians(30+50)
         # # Poinstion(rad) control, set RL_0 rad
         for name in ["RL_0", "RR_0", "FL_0", "FR_0"]:
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
