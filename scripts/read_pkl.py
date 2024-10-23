@@ -4,7 +4,7 @@ import numpy as np
 from constants.unitree_legged_const import LegID
 
 if __name__ == "__main__":
-    with (open("joint_2_min_max.pkl", "rb")) as openfile:
+    with (open("hips.pkl", "rb")) as openfile:
         joint_commands = pickle.load(openfile)
         joint_states = pickle.load(openfile)
 
