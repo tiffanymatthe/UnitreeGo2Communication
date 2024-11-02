@@ -6,7 +6,8 @@ from constants.unitree_legged_const import LegID, JOINT_LIMITS
 
 if __name__ == "__main__":
     pkl_and_motors = {
-        "hips.pkl": ["RL_0", "RR_0", "FL_0", "FR_0"],
+        "hips.pkl": ["RR_0", "FL_0", "FR_0"],
+        "sinusoidal_logs.pkl": ["RL_0"],
         "RL_1.pkl": ["RL_1"],
         "RR_1.pkl": ["RR_1"],
         "FL_1.pkl": ["FL_1"],

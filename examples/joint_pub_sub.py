@@ -21,7 +21,7 @@ Current functionality: sends hip joint positions in a sinusoidal wave and reads 
 
 PUB_FREQ = 250
 PUB_PERIOD = 1/PUB_FREQ
-FREQUENCIES = [1/12,1/8,1/7,1/6,1/5,1/4]
+FREQUENCIES = [1/8,1/6,1/4,1/2] #,1/2,1,1.2,1.5]
 
 crc = CRC()
 
@@ -87,9 +87,9 @@ if __name__ == '__main__':
         cmd.motor_cmd[go2.LegID[name]].kd = 1.0  # Position (rad) control kd gain
         cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
 
-    # motors_to_control = ["RL_2", "RR_2", "FL_2", "FR_2"]
-    # motors_to_control = ["RR_1"] #, "RR_1", "FL_1", "FR_1"]
-    motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
+    # motors_to_control = ["FR_2"] #, "RR_2", "FL_2", "FR_2"]
+    motors_to_control = ["FR_1"] #, "RR_1", "FL_1", "FR_1"]
+    # motors_to_control = ["FR_0"] #, "RR_0", "FL_0", "FR_0"]
 
     # set everything not q
     for name in motors_to_control:
@@ -109,9 +109,10 @@ if __name__ == '__main__':
     while freq_index < len(FREQUENCIES):
         start_time = time.time()
         elapsed_time = start_time - time_0
-        if freq * elapsed_time >= freq_index + 1:
+        if freq * elapsed_time >= 1:
             freq_index += 1
             if freq_index < len(FREQUENCIES):
+                print(f"{freq_index} / {len(FREQUENCIES)}")
                 freq = FREQUENCIES[freq_index]
                 time_0 = start_time
         for name in motors_to_control:
