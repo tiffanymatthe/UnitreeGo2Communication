@@ -88,8 +88,8 @@ if __name__ == '__main__':
         cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
 
     # motors_to_control = ["RL_2", "RR_2", "FL_2", "FR_2"]
-    motors_to_control = ["RR_1"] #, "RR_1", "FL_1", "FR_1"]
-    # motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
+    # motors_to_control = ["RR_1"] #, "RR_1", "FL_1", "FR_1"]
+    motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
 
     # set everything not q
     for name in motors_to_control:
