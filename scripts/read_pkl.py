@@ -5,22 +5,24 @@ from collections import defaultdict
 from constants.unitree_legged_const import LegID, JOINT_LIMITS
 
 if __name__ == "__main__":
-    pkl_and_motors = {
-        "hips.pkl": ["RR_0", "FL_0", "FR_0"],
-        "sinusoidal_logs.pkl": ["RL_0"],
-        "RL_1.pkl": ["RL_1"],
-        "RR_1.pkl": ["RR_1"],
-        "FL_1.pkl": ["FL_1"],
-        "FR_1.pkl": ["FR_1"],
-        "calves.pkl": ["RL_2", "RR_2", "FL_2", "FR_2"],
-    }
+    # pkl_and_motors = {
+    #     "hips.pkl": ["RR_0", "FL_0", "FR_0"],
+    #     "sinusoidal_logs.pkl": ["RL_0"],
+    #     "RL_1.pkl": ["RL_1"],
+    #     "RR_1.pkl": ["RR_1"],
+    #     "FL_1.pkl": ["FL_1"],
+    #     "FR_1.pkl": ["FR_1"],
+    #     "calves.pkl": ["RL_2", "RR_2", "FL_2", "FR_2"],
+    # }
     motors_to_plot = ["RL_0", "RR_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FL_2", "FR_2"]
 
     # key is motor, value is tuple of time and command
     commands_to_plot = defaultdict(lambda: [[], []])
     states_to_plot = defaultdict(lambda: [[], []])
 
-    for pkl_file, motors in pkl_and_motors.items():
+    for motor in motors_to_plot: # pkl_file, motors in pkl_and_motors.items():
+        motors = [motor]
+        pkl_file=f"{motor}_ramp.pkl"
         with (open(pkl_file, "rb")) as openfile:
             joint_commands = pickle.load(openfile)
             joint_states = pickle.load(openfile)
