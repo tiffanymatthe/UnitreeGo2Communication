@@ -12,6 +12,7 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import Thread
 import constants.unitree_legged_const as go2
+import utils.client_utils as client_utils
 
 '''
 IMPORTANT: Turn off sport mode beforehand. Must suspend robot with harness.
@@ -35,6 +36,9 @@ if __name__ == '__main__':
     else:
         ChannelFactoryInitialize(0)
 
+    rsc = client_utils.get_robot_state_client()
+    client_utils.set_service(rsc, "sport_mode", False)
+
     # Create a publisher to publish the data defined in UserData class
     pub = ChannelPublisher("rt/lowcmd", LowCmd_)
     pub.Init()
@@ -56,25 +60,19 @@ if __name__ == '__main__':
         cmd.motor_cmd[i].tau = 0
 
     # https://github.com/unitreerobotics/unitree_rl_gym/tree/main/resources/robots/go2/urdf
-    # calf (2)
-    # min_amp = -2.7227
-    # max_amp = -0.83776
-    # thigh (1)
-    # min_amp = -1.5708
-    # max_amp = 3.4907
-    # hip (0)
-    min_amp = -1.0472
-    max_amp = 1.0472
-    amplitude = (max_amp - min_amp) / 2
-    offset = (max_amp + min_amp) / 2
+    amplitude = {}
+    offset = {}
+    freq = {}
+    for joint in go2.LegID.keys():
+        min_amp, max_amp = go2.JOINT_LIMITS[joint][0], go2.JOINT_LIMITS[joint][1]
+        amplitude[joint] = (max_amp - min_amp) / 2
+        offset[joint] = (max_amp + min_amp) / 2
 
-    # adjusted to avoid large changes in angles
-    if amplitude > 2.0944:
-        freq = 1/8 * 2.0944/amplitude
-    else:
-        freq = 1/8
-
-    print(f"Chosen frequency of sin: {freq}")
+        # adjusted to avoid large changes in angles
+        if amplitude[joint] > 2.0944:
+            freq[joint] = 1/8 * 2.0944/amplitude[joint]
+        else:
+            freq[joint] = 1/8
 
     # tuple with current time and joint commands
     joint_command_log = []
@@ -104,8 +102,8 @@ if __name__ == '__main__':
 
     for i in range(10 * 300):
         start_time = time.time()
-        sinusoidal_q = amplitude * math.sin(2 * math.pi * freq * (start_time - time_0)) + offset
         for name in motors_to_control:
+            sinusoidal_q = amplitude[name] * math.sin(2 * math.pi * freq[name] * (start_time - time_0)) + offset[name]
             cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Target angular(rad)
         
         cmd.crc = crc.Crc(cmd)
