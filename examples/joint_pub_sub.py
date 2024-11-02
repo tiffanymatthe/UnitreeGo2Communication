@@ -21,6 +21,7 @@ Current functionality: sends hip joint positions in a sinusoidal wave and reads 
 
 PUB_FREQ = 250
 PUB_PERIOD = 1/PUB_FREQ
+FREQUENCIES = [1/12,1/8,1/7,1/6,1/5,1/4]
 
 crc = CRC()
 
@@ -62,17 +63,17 @@ if __name__ == '__main__':
     # https://github.com/unitreerobotics/unitree_rl_gym/tree/main/resources/robots/go2/urdf
     amplitude = {}
     offset = {}
-    freq = {}
+    # freq = {}
     for joint in go2.LegID.keys():
         min_amp, max_amp = go2.JOINT_LIMITS[joint][0], go2.JOINT_LIMITS[joint][1]
         amplitude[joint] = (max_amp - min_amp) / 2
         offset[joint] = (max_amp + min_amp) / 2
 
-        # adjusted to avoid large changes in angles
-        if amplitude[joint] > 2.0944:
-            freq[joint] = 1/8 * 2.0944/amplitude[joint]
-        else:
-            freq[joint] = 1/8
+        # # adjusted to avoid large changes in angles
+        # if amplitude[joint] > 2.0944:
+        #     freq[joint] = 1/8 * 2.0944/amplitude[joint]
+        # else:
+        #     freq[joint] = 1/8
 
     # tuple with current time and joint commands
     joint_command_log = []
@@ -87,8 +88,8 @@ if __name__ == '__main__':
         cmd.motor_cmd[go2.LegID[name]].tau = 0.0 # Feedforward toque 1N.m
 
     # motors_to_control = ["RL_2", "RR_2", "FL_2", "FR_2"]
-    # motors_to_control = ["FR_1"] #, "RR_1", "FL_1", "FR_1"]
-    motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
+    motors_to_control = ["RR_1"] #, "RR_1", "FL_1", "FR_1"]
+    # motors_to_control = ["RL_0", "RR_0", "FL_0", "FR_0"]
 
     # set everything not q
     for name in motors_to_control:
@@ -100,10 +101,21 @@ if __name__ == '__main__':
 
     time_0 = time.time()
 
-    for i in range(10 * 300):
+    # Initialize next_time to ensure consistent timing
+    next_time = time.time()
+
+    freq_index = 0
+    freq = FREQUENCIES[freq_index]
+    while freq_index < len(FREQUENCIES):
         start_time = time.time()
+        elapsed_time = start_time - time_0
+        if freq * elapsed_time >= freq_index + 1:
+            freq_index += 1
+            if freq_index < len(FREQUENCIES):
+                freq = FREQUENCIES[freq_index]
+                time_0 = start_time
         for name in motors_to_control:
-            sinusoidal_q = amplitude[name] * math.sin(2 * math.pi * freq[name] * (start_time - time_0)) + offset[name]
+            sinusoidal_q = amplitude[name] * math.sin(2 * math.pi * freq * elapsed_time) + offset[name]
             cmd.motor_cmd[go2.LegID[name]].q = sinusoidal_q  # Target angular(rad)
         
         cmd.crc = crc.Crc(cmd)
@@ -113,9 +125,10 @@ if __name__ == '__main__':
             joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
         else:
             print("Waiting for subscriber.")
-        end_time = time.time()
-        if end_time - start_time < PUB_PERIOD:
-            time.sleep(PUB_PERIOD - (end_time - start_time))
+
+        # Update next_time and sleep for the remaining time
+        next_time += PUB_PERIOD
+        time.sleep(max(0, next_time - time.time()))
 
     pub.Close()
     sub.Close()
@@ -126,6 +139,6 @@ if __name__ == '__main__':
     with open(log_file, 'wb') as f:
         pickle.dump(joint_command_log, f)
         pickle.dump(joint_state_log, f)
-        pickle.dump({"amplitude": amplitude, "offset": offset, "freq": freq},f)
+        pickle.dump({"amplitude": amplitude, "offset": offset, "freq": FREQUENCIES},f)
 
     print(f"Saved to {log_file}")
