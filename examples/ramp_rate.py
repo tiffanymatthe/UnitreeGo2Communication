@@ -117,38 +117,45 @@ if __name__ == '__main__':
     ramp_index = 0
     period_index = 0
 
-    next_time = time.time()
+    start_time = time.perf_counter()
 
     while True:
-        # try going to ramp_rate * pub period (rad)
-        for motor in motors_to_control:
-            change_in_q = RAMP_RATES[ramp_index] * PUB_PERIOD * period_index
-            cmd.motor_cmd[go2.LegID[motor]].q = target_positions[motor] + change_in_q
+        current_time = time.perf_counter()
+        elapsed_time = current_time - start_time
 
-        cmd.crc = crc.Crc(cmd)
+        if elapsed_time >= PUB_PERIOD * (period_index + 1):
+            # try going to ramp_rate * pub period (rad)
+            for motor in motors_to_control:
+                change_in_q = RAMP_RATES[ramp_index] * PUB_PERIOD * period_index
+                cmd.motor_cmd[go2.LegID[motor]].q = target_positions[motor] + change_in_q
 
-        #Publish message
-        if pub.Write(cmd):
-            joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
-        else:
-            print("Waiting for subscriber.")
+            cmd.crc = crc.Crc(cmd)
 
-        latest_joint_states = joint_state_log[-1][1]
-        reached_target = True
-        for motor in motors_to_control:
-            if latest_joint_states[go2.LegID[motor]].q < MAX_RADIANS + target_positions[motor]:
-                reached_target = False
-        if reached_target:
-            period_index = -1 # since adding by 1 at the end of this loop
-            ramp_index += 1
-            move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
-            if ramp_index >= len(RAMP_RATES):
-                break
+            #Publish message
+            if pub.Write(cmd):
+                joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
+            else:
+                print("Waiting for subscriber.")
+
+            latest_joint_states = joint_state_log[-1][1]
+            reached_target = True
+            for motor in motors_to_control:
+                if latest_joint_states[go2.LegID[motor]].q < MAX_RADIANS + target_positions[motor]:
+                    reached_target = False
+            if reached_target:
+                period_index = -1 # since adding by 1 at the end of this loop
+                ramp_index += 1
+                move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
+                start_time = time.perf_counter()
+                if ramp_index >= len(RAMP_RATES):
+                    break
+
+            period_index += 1
 
         # Update next_time and sleep for the remaining time
-        period_index += 1
-        next_time += PUB_PERIOD
-        time.sleep(max(0, next_time - time.time()))
+        time_to_sleep = PUB_PERIOD * (period_index + 1) - (time.perf_counter() - start_time)
+        if time_to_sleep > 0:
+            time.sleep(time_to_sleep)
 
     pub.Close()
     sub.Close()
