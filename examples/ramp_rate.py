@@ -155,10 +155,10 @@ if __name__ == '__main__':
 
     print("Closed pub and sub.")
 
-    log_file = "ramp_logs.pkl"
+    log_file = "ramp_" + "_".join(motors_to_control) + ".pkl"
     with open(log_file, 'wb') as f:
         pickle.dump(joint_command_log, f)
         pickle.dump(joint_state_log, f)
-        # pickle.dump({"amplitude": amplitude, "offset": offset, "freq": FREQUENCIES},f)
+        pickle.dump({"ramp_rates": RAMP_RATES, "pub_freq": PUB_FREQ, "max_radians": MAX_RADIANS},f)
 
     print(f"Saved to {log_file}")
