@@ -21,8 +21,13 @@ IMPORTANT: Turn off sport mode beforehand. Must suspend robot with harness.
 PUB_FREQ = 250
 PUB_PERIOD = 1/PUB_FREQ
 
-RAMP_RATES = [2,4,6,8] # rad / s
-MAX_RADIANS = 30
+DEFAULT_RAMP_RATE = 2 * math.pi / 180
+
+DEG_TO_RAD = math.pi / 180
+
+# RAMP_RATES = [DEFAULT_RAMP_RATE,6 * DEG_TO_RAD,10 * DEG_TO_RAD,15 * DEG_TO_RAD] # rad / s
+RADIAN_SHIFT = [10 * DEG_TO_RAD] #, 20 * DEG_TO_RAD, 30 * DEG_TO_RAD]
+MAX_RADIANS = 30 * math.pi / 180
 
 crc = CRC()
 
@@ -34,28 +39,43 @@ def read_joints(msg: LowState_):
     joint_state_log.append((time.time(), msg.motor_state))
 
 def move_to_initial_pose(cmd, pub, motors, target_positions):
+    while len(joint_state_log) == 0:
+        print(f"Waiting for subscriber to get a data point.")
 
-    for name in motors:
-        cmd.motor_cmd[go2.LegID[name]].mode = 0x01
-        cmd.motor_cmd[go2.LegID[name]].q = target_positions[name]
-        cmd.motor_cmd[go2.LegID[name]].kp = 1.0 
-        cmd.motor_cmd[go2.LegID[name]].dq = 0.0
-        cmd.motor_cmd[go2.LegID[name]].kd = 1.0
-        cmd.motor_cmd[go2.LegID[name]].tau = 0.0
+    period_count = 0
 
     while True:
+        current_time = time.perf_counter()
+        for name in motors:
+            latest_joint_states = joint_state_log[-1][1]
+            if target_positions[name] < latest_joint_states[go2.LegID[name]].q:
+                intermediate_target = max(latest_joint_states[go2.LegID[name]].q - DEFAULT_RAMP_RATE * PUB_PERIOD * period_count, target_positions[name])
+            else:
+                intermediate_target = min(latest_joint_states[go2.LegID[name]].q + DEFAULT_RAMP_RATE * PUB_PERIOD * period_count, target_positions[name])
+            cmd.motor_cmd[go2.LegID[name]].mode = 0x01
+            cmd.motor_cmd[go2.LegID[name]].q = intermediate_target
+            cmd.motor_cmd[go2.LegID[name]].kp = 15.0
+            cmd.motor_cmd[go2.LegID[name]].dq = 0.0
+            cmd.motor_cmd[go2.LegID[name]].kd = 1.0
+            cmd.motor_cmd[go2.LegID[name]].tau = 0.0
+
         cmd.crc = crc.Crc(cmd)
         if pub.Write(cmd):
             joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
         else:
             print("Waiting for subscriber.")
 
-        time.sleep(1)
+        sleep_time = time.perf_counter() - current_time
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+
+        period_count += 1
 
         latest_joint_states = joint_state_log[-1][1]
         reached_target = True
         for motor in motors:
-            if not math.isclose(latest_joint_states[go2.LegID[motor]].q, target_positions[motor], abs_tol=0.001):
+            if not math.isclose(latest_joint_states[go2.LegID[motor]].q, target_positions[motor], abs_tol=0.15):
+                # print(f"Want {latest_joint_states[go2.LegID[motor]].q} to match {target_positions[motor]}")
                 reached_target = False
         if reached_target:
             break
@@ -107,53 +127,55 @@ if __name__ == '__main__':
     hip_motors = ["RL_0", "RR_0", "FL_0", "FR_0"]
     move_to_initial_pose(cmd, pub, hip_motors, target_positions)
 
-    # motors_to_control = ["FR_2"] #, "RR_2", "FL_2", "FR_2"]
+    # # motors_to_control = ["FR_2"] #, "RR_2", "FL_2", "FR_2"]
     motors_to_control = ["FR_1"] #, "RR_1", "FL_1", "FR_1"]
-    # motors_to_control = ["FR_0"] #, "RR_0", "FL_0", "FR_0"]
+    # # motors_to_control = ["FR_0"] #, "RR_0", "FL_0", "FR_0"]
 
     # sets first position to q=0
     move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
 
+    print(f"Finished moving to target positions for initialization.")
+
     ramp_index = 0
     period_index = 0
 
+    for motor in motors_to_control:
+        cmd.motor_cmd[go2.LegID[motor]].q = target_positions[motor] + RADIAN_SHIFT[ramp_index]
+        cmd.crc = crc.Crc(cmd)
+
     start_time = time.perf_counter()
+
+    print(f"Starting test.")
 
     while True:
         current_time = time.perf_counter()
         elapsed_time = current_time - start_time
 
-        if elapsed_time >= PUB_PERIOD * (period_index + 1):
-            # try going to ramp_rate * pub period (rad)
+        # Publish message
+        if pub.Write(cmd):
+            joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
+        else:
+            print("Waiting for subscriber.")
+
+        latest_joint_states = joint_state_log[-1][1]
+        reached_target = True
+        for motor in motors_to_control:
+            if latest_joint_states[go2.LegID[motor]].q < target_positions[motor] + RADIAN_SHIFT[ramp_index]:
+                print(f"Did not reach target: {latest_joint_states[go2.LegID[motor]].q} < {target_positions[motor] + RADIAN_SHIFT[ramp_index]}")
+                reached_target = False
+        if reached_target:
+            ramp_index += 1
+            print(f"Changing shift.")
+            move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
             for motor in motors_to_control:
-                change_in_q = RAMP_RATES[ramp_index] * PUB_PERIOD * period_index
-                cmd.motor_cmd[go2.LegID[motor]].q = target_positions[motor] + change_in_q
-
-            cmd.crc = crc.Crc(cmd)
-
-            #Publish message
-            if pub.Write(cmd):
-                joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
-            else:
-                print("Waiting for subscriber.")
-
-            latest_joint_states = joint_state_log[-1][1]
-            reached_target = True
-            for motor in motors_to_control:
-                if latest_joint_states[go2.LegID[motor]].q < MAX_RADIANS + target_positions[motor]:
-                    reached_target = False
-            if reached_target:
-                period_index = -1 # since adding by 1 at the end of this loop
-                ramp_index += 1
-                move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
-                start_time = time.perf_counter()
-                if ramp_index >= len(RAMP_RATES):
-                    break
-
-            period_index += 1
-
+                cmd.motor_cmd[go2.LegID[motor]].q = target_positions[motor] + RADIAN_SHIFT[ramp_index]
+                cmd.crc = crc.Crc(cmd)
+            if ramp_index >= len(RADIAN_SHIFT):
+                break
+        
+        period_index += 1
         # Update next_time and sleep for the remaining time
-        time_to_sleep = PUB_PERIOD * (period_index + 1) - (time.perf_counter() - start_time)
+        time_to_sleep = PUB_PERIOD * (period_index) - (time.perf_counter() - start_time)
         if time_to_sleep > 0:
             time.sleep(time_to_sleep)
 
@@ -162,10 +184,10 @@ if __name__ == '__main__':
 
     print("Closed pub and sub.")
 
-    log_file = "ramp_" + "_".join(motors_to_control) + ".pkl"
+    log_file = "shift_" + "_".join(motors_to_control) + ".pkl"
     with open(log_file, 'wb') as f:
         pickle.dump(joint_command_log, f)
         pickle.dump(joint_state_log, f)
-        pickle.dump({"ramp_rates": RAMP_RATES, "pub_freq": PUB_FREQ, "max_radians": MAX_RADIANS},f)
+        pickle.dump({"radian_shifts": RADIAN_SHIFT, "pub_freq": PUB_FREQ, "max_radians": MAX_RADIANS},f)
 
     print(f"Saved to {log_file}")
