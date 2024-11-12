@@ -25,9 +25,9 @@ DEFAULT_RAMP_RATE = 2 * math.pi / 180
 
 DEG_TO_RAD = math.pi / 180
 
-RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD, 90 * DEG_TO_RAD] # rad / s
+RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD] #, 90 * DEG_TO_RAD] # rad / s
 # RADIAN_SHIFT = [10 * DEG_TO_RAD] #, 20 * DEG_TO_RAD, 30 * DEG_TO_RAD]
-MAX_RADIANS = 80 * math.pi / 180
+MAX_RADIANS = 60 * math.pi / 180
 
 crc = CRC()
 
@@ -42,7 +42,7 @@ def move_to_initial_pose(cmd, pub, motors, target_positions):
     while len(joint_state_log) == 0:
         print(f"Waiting for subscriber to get a data point.")
 
-    period_count = 0
+    period_count = 1
 
     while True:
         current_time = time.perf_counter()
@@ -78,6 +78,11 @@ def move_to_initial_pose(cmd, pub, motors, target_positions):
                 # print(f"Want {latest_joint_states[go2.LegID[motor]].q} to match {target_positions[motor]}")
                 reached_target = False
         if reached_target:
+            cmd.crc = crc.Crc(cmd)
+            if pub.Write(cmd):
+                joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
+            else:
+                print("Waiting for subscriber.")
             break
     
     for name in motors:
@@ -127,14 +132,14 @@ if __name__ == '__main__':
     hip_motors = ["RL_0", "RR_0", "FL_0", "FR_0"]
     move_to_initial_pose(cmd, pub, hip_motors, target_positions)
 
-    motors_to_control = ["FR_2"] #, "RR_2", "FL_2", "FR_2"]
+    # motors_to_control = ["RL_2"] #, "RR_2", "FL_2", "FR_2"]
     # motors_to_control = ["RL_1"] #, "RR_1", "FL_1", "FR_1"]
-    # # motors_to_control = ["FR_0"] #, "RR_0", "FL_0", "FR_0"]
+    motors_to_control = ["RR_0"] #, "RR_0", "FL_0", "FR_0"]
 
     for motor in motors_to_control:
         limits = go2.JOINT_LIMITS[motor]
         print(f"Changing {target_positions[motor]}")
-        target_positions[motor] = limits[0] + 15 * DEG_TO_RAD
+        target_positions[motor] = limits[0] + 20 * DEG_TO_RAD
         print(f"to {target_positions[motor]}")
 
     # sets first position to q=0
