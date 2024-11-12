@@ -25,9 +25,9 @@ DEFAULT_RAMP_RATE = 2 * math.pi / 180
 
 DEG_TO_RAD = math.pi / 180
 
-RAMP_RATES = [DEFAULT_RAMP_RATE,6 * DEG_TO_RAD,10 * DEG_TO_RAD,15 * DEG_TO_RAD] # rad / s
+RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD, 90 * DEG_TO_RAD] # rad / s
 # RADIAN_SHIFT = [10 * DEG_TO_RAD] #, 20 * DEG_TO_RAD, 30 * DEG_TO_RAD]
-MAX_RADIANS = 30 * math.pi / 180
+MAX_RADIANS = 80 * math.pi / 180
 
 crc = CRC()
 
@@ -127,9 +127,15 @@ if __name__ == '__main__':
     hip_motors = ["RL_0", "RR_0", "FL_0", "FR_0"]
     move_to_initial_pose(cmd, pub, hip_motors, target_positions)
 
-    # # motors_to_control = ["FR_2"] #, "RR_2", "FL_2", "FR_2"]
-    motors_to_control = ["FR_1"] #, "RR_1", "FL_1", "FR_1"]
+    motors_to_control = ["FR_2"] #, "RR_2", "FL_2", "FR_2"]
+    # motors_to_control = ["RL_1"] #, "RR_1", "FL_1", "FR_1"]
     # # motors_to_control = ["FR_0"] #, "RR_0", "FL_0", "FR_0"]
+
+    for motor in motors_to_control:
+        limits = go2.JOINT_LIMITS[motor]
+        print(f"Changing {target_positions[motor]}")
+        target_positions[motor] = limits[0] + 15 * DEG_TO_RAD
+        print(f"to {target_positions[motor]}")
 
     # sets first position to q=0
     move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
@@ -150,7 +156,8 @@ if __name__ == '__main__':
         if elapsed_time >= PUB_PERIOD * (period_index + 1):
             for motor in motors_to_control:
                 change_in_q = RAMP_RATES[ramp_index] * PUB_PERIOD * period_index
-                cmd.motor_cmd[go2.LegID[motor]].q = target_positions[motor] + change_in_q
+                cmd.motor_cmd[go2.LegID[motor]].q = min(target_positions[motor] + change_in_q, go2.JOINT_LIMITS[motor][1])
+                # print(f"Sending {min(target_positions[motor] + change_in_q, go2.JOINT_LIMITS[motor][1])}")
 
             cmd.crc = crc.Crc(cmd)
 
@@ -163,9 +170,9 @@ if __name__ == '__main__':
             latest_joint_states = joint_state_log[-1][1]
             reached_target = True
             for motor in motors_to_control:
-                if latest_joint_states[go2.LegID[motor]].q < MAX_RADIANS + target_positions[motor]:
+                if latest_joint_states[go2.LegID[motor]].q < min(MAX_RADIANS + target_positions[motor], go2.JOINT_LIMITS[motor][1]):
                     reached_target = False
-                    print(f"{latest_joint_states[go2.LegID[motor]].q} < {MAX_RADIANS + target_positions[motor]}")
+                    # print(f"{latest_joint_states[go2.LegID[motor]].q} < {MAX_RADIANS + target_positions[motor]}, {go2.JOINT_LIMITS[motor][1]}")
             if reached_target:
                 ramp_index += 1
                 period_index = -1
