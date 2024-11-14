@@ -25,6 +25,8 @@ key_state = [
     ["left", 0],
 ]
 
+# Pressing B makes keys = 512
+
 
 def WirelessControllerHandler(msg: WirelessController_):
     global key_state
