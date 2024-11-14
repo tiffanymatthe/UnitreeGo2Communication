@@ -31,6 +31,7 @@ def read_joints(msg: LowState_):
     joint_state_log.append((time.time(), msg.motor_state))
 
 def WirelessControllerHandler(msg: WirelessController_):
+    global stop_program
     if msg.keys == 512:
         print(f"Stop program!")
         stop_program = True
@@ -78,6 +79,7 @@ if __name__ == '__main__':
     while True:
         # read from joystick first for termination signal and then go prone
         if stop_program:
+            print(f"DAMPING")
             for motor, id in go2.LegID.items():
                 # https://github.com/Teddy-Liao/walk-these-ways-go2/blob/ed4cedecfc4f18f4d1cccd1a605cedc5bd111af9/go2_gym_deploy/unitree_sdk2_bin/library/unitree_sdk2/example/state_machine/robot_controller.hpp#L270
                 cmd.motor_cmd[id].q = 0.0 # set to init position instead?
@@ -93,7 +95,7 @@ if __name__ == '__main__':
             if not wrote_to_log_file:
                 log_file = "model_logs.pkl"
                 with open(log_file, 'wb') as f:
-                    pickle.dump(pub.logs, f)
+                    # pickle.dump(pub.logs, f)
                     pickle.dump(joint_state_log, f)
                 print(f"Saved to {log_file} after stopping program.")
                 wrote_to_log_file = True
