@@ -84,7 +84,8 @@ if __name__ == "__main__":
     #     "FR_1.pkl": ["FR_1"],
     #     "calves.pkl": ["RL_2", "RR_2", "FL_2", "FR_2"],
     # }
-    motors_to_plot = ["RL_0", "RR_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FL_2", "FR_2"]
+    # motors_to_plot = ["RL_0", "RR_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FL_2", "FR_2"]
+    motors_to_plot = ["RL_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FR_2"]
 
     # key is motor, value is tuple of time and command
     commands_to_plot = defaultdict(lambda: [[], []])
@@ -94,15 +95,16 @@ if __name__ == "__main__":
 
     for motor in motors_to_plot: # pkl_file, motors in pkl_and_motors.items():
         motors = [motor]
-        pkl_file=f"{motor}_ramp.pkl"
+        # pkl_file=f"ramp1_FR_0.pkl"
+        pkl_file=f"ramp1_{motor}.pkl"
         with (open(pkl_file, "rb")) as openfile:
             joint_commands = pickle.load(openfile)
             joint_states = pickle.load(openfile)
             info = pickle.load(openfile)
             # print(f"{motor}: {get_largest_slope(info['amplitude'][motor], info['freq'])}")
-            ramp_rate = get_largest_slope(info['amplitude'][motor], info['freq'])
-            ramp_rates[motor] = ramp_rate
-            offsets[motor] = info["offset"][motor]
+            # ramp_rate = get_largest_slope(info['amplitude'][motor], info['freq'])
+            # ramp_rates[motor] = ramp_rate
+            # offsets[motor] = info["offset"][motor]
 
         time_offset = joint_commands[0][0]
         joint_command_times = [command[0] - time_offset for command in joint_commands]
@@ -132,8 +134,9 @@ if __name__ == "__main__":
 
     from scipy.interpolate import interp1d
 
-    for joint_idx in range(len(motors_to_plot)):
-        motor = motors_to_plot[joint_idx]
+    for motor in motors_to_plot:
+        joint_idx = LegID[motor]
+        # motor = motors_to_plot[joint_idx]
         # Extract joint command and state for the current joint
         joint_cmd = commands_to_plot[motor][1]
         joint_cmd_time = commands_to_plot[motor][0]
@@ -157,10 +160,10 @@ if __name__ == "__main__":
 
         joint_cmd = remove_spikes(joint_cmd)
 
-        lags, cmd_crossings, state_crossings = get_lag(joint_cmd, joint_cmd_time, joint_state, joint_state_time, offsets[motor])
+        # lags, cmd_crossings, state_crossings = get_lag(joint_cmd, joint_cmd_time, joint_state, joint_state_time, offsets[motor])
         # print(f"{motor}: lag times {lags}")
 
-        print(f"{motor}: {ramp_rates[motor]} and {lags}")
+        # print(f"{motor}: {ramp_rates[motor]} and {lags}")
 
         # axs.flatten()[joint_idx].scatter(ramp_rates[motor], lags)
         # axs.flatten()[joint_idx].set_ylabel(f'Joint {motor} lag (s)')
@@ -170,11 +173,11 @@ if __name__ == "__main__":
         
         # Plot joint command
         axs.flatten()[joint_idx].plot(joint_cmd_time, joint_cmd, label=f'Command', color='b')
-        axs.flatten()[joint_idx].scatter(cmd_crossings, np.ones(len(cmd_crossings)) * offsets[motor], s=15)
+        # axs.flatten()[joint_idx].scatter(cmd_crossings, np.ones(len(cmd_crossings)) * offsets[motor], s=15)
         
         # Plot joint state
         axs.flatten()[joint_idx].plot(joint_state_time, joint_state, label=f'State', color='r', linestyle='--')
-        axs.flatten()[joint_idx].scatter(state_crossings, np.ones(len(state_crossings)) * offsets[motor], s=15)
+        # axs.flatten()[joint_idx].scatter(state_crossings, np.ones(len(state_crossings)) * offsets[motor], s=15)
 
         # plot joint limits
         axs.flatten()[joint_idx].axhline(JOINT_LIMITS[motor][0], color='black', linestyle="dotted")
