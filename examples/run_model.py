@@ -3,7 +3,7 @@ import sys
 import math
 import pickle
 import copy
-from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
+from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber, ChannelFactoryInitialize
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__WirelessController_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import WirelessController_
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     client_utils.set_service(rsc, "sport_mode", False)
 
     # Create a publisher to publish the data defined in UserData class
-    pub = pub_utils.ChannelLogPublisher("rt/lowcmd", LowCmd_)
+    pub = ChannelPublisher("rt/lowcmd", LowCmd_)
     pub.Init()
 
     sub = ChannelSubscriber("rt/lowstate", LowState_)
