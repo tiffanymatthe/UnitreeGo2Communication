@@ -14,29 +14,28 @@ from unitree_sdk2py.utils.crc import CRC
 import constants.unitree_legged_const as go2
 import utils.client_utils as client_utils
 import utils.publisher_utils as pub_utils
+import utils.isaacgym_utils as isaac_utils
+from utils.state_estimator import StateEstimator
 
 PUB_FREQ = 250
 PUB_PERIOD = 1/PUB_FREQ
 
-KP = 10 # 20
-KD = 1 # 0.5
+KP = 20
+KD = 0.5
 
 crc = CRC()
 
-joint_state_log = []
-stop_program = False
 wrote_to_log_file = False
 
-def read_joints(msg: LowState_):
-    joint_state_log.append((time.time(), msg.motor_state))
-
-def WirelessControllerHandler(msg: WirelessController_):
-    global stop_program
-    if msg.keys == 512:
-        print(f"Stop program!")
-        stop_program = True
-    else:
-        print(f"Received {msg}")
+def get_obs(se: StateEstimator):
+    # obs = lin vel, ang vel, projected gravity, commands, dof pos, dof vel, actions
+    base_lin_vel = se.body_lin_vel
+    base_ang_vel = se.body_ang_vel
+    projected_gravity = se.get_gravity_vector()
+    commands = ...
+    dof_pos = se.get_dof_pos()
+    dof_vel = se.get_dof_vel()
+    actions = ...
 
 if __name__ == '__main__':
 
@@ -79,7 +78,6 @@ if __name__ == '__main__':
     while True:
         # read from joystick first for termination signal and then go prone
         if stop_program:
-            print(f"DAMPING")
             for motor, id in go2.LegID.items():
                 # https://github.com/Teddy-Liao/walk-these-ways-go2/blob/ed4cedecfc4f18f4d1cccd1a605cedc5bd111af9/go2_gym_deploy/unitree_sdk2_bin/library/unitree_sdk2/example/state_machine/robot_controller.hpp#L270
                 cmd.motor_cmd[id].q = 0.0 # set to init position instead?
@@ -105,6 +103,7 @@ if __name__ == '__main__':
         # latest_joint_state = joint_state_log[-1][1]
         # # TODO: convert joint state to observation that policy can take in
         # obs = ...
+        # lin vel, ang vel, projected gravity, commands, dof pos, dof vel, actions
 
         # action = model(obs)
 
