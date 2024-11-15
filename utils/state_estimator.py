@@ -1,7 +1,7 @@
 import time as time
 import numpy as np
 import math
-import threading
+from filterpy.kalman import KalmanFilter
 
 from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowState_
@@ -76,6 +76,15 @@ class StateEstimator:
 
         self.contact_state = np.ones(4)
 
+        # Kalman Filter initialization
+        self.kf = KalmanFilter(dim_x=3, dim_z=3)
+        self.kf.x = np.zeros(3)  # initial velocity estimate (x, y, z)
+        self.kf.F = np.eye(3)    # state transition matrix
+        self.kf.H = np.eye(3)    # measurement function (direct observation)
+        self.kf.P *= 1.0         # initial uncertainty
+        self.kf.R = np.eye(3) * 0.1  # measurement noise
+        self.kf.Q = np.eye(3) * 0.1  # process noise
+
         self.init_time = time.time()
         self.received_first_legdata = False
 
@@ -93,6 +102,41 @@ class StateEstimator:
     def get_body_linear_vel(self):
         self.body_lin_vel = np.dot(self.R.T, self.world_lin_vel)
         return self.body_lin_vel
+    
+    # CHATGPT
+    def get_body_linear_vel(self):
+        """Estimate body linear velocity using the Kalman Filter."""
+        # Rotation matrix to body frame
+        body_vel_estimate = np.dot(self.R.T, self.world_lin_vel)
+
+        # Apply Kalman Filter: Assume self.world_lin_vel is derived from accelerometer (prediction)
+        delta_time = time.time() - self.timuprev
+        self.kf.predict()
+        
+        # Update the filter if contacts are detected
+        observed_velocities = self.get_observed_velocities()
+        if len(observed_velocities) > 0:
+            mean_observed_velocity = np.mean(observed_velocities, axis=0)
+            self.kf.update(mean_observed_velocity)
+        else:
+            # Without contacts, use the predicted value with high uncertainty
+            self.kf.update(body_vel_estimate + np.random.randn(3) * 0.1)
+
+        # Update world velocity from Kalman Filter result
+        self.world_lin_vel = self.kf.x  # Kalman filter velocity estimate
+        self.body_lin_vel = np.dot(self.R.T, self.world_lin_vel)
+        return self.body_lin_vel
+
+    def get_observed_velocities(self):
+        """Calculate velocities based on foot contacts."""
+        observed_velocities = []
+        for i in range(4):
+            if self.contact_state[i]:
+                # Compute observed velocity for foot i and append
+                # (similar to C++ observed velocity calculation)
+                observed_velocity = np.zeros(3)  # Replace with actual calculation
+                observed_velocities.append(observed_velocity)
+        return observed_velocities
 
     def get_body_angular_vel(self):
         self.body_ang_vel = self.smoothing_ratio * np.mean(self.deuler_history / self.dt_history, axis=0) + (
