@@ -25,9 +25,9 @@ DEFAULT_RAMP_RATE = 2 * math.pi / 180
 
 DEG_TO_RAD = math.pi / 180
 
-RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD] #, 90 * DEG_TO_RAD] # rad / s
+RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD, 90 * DEG_TO_RAD] #, 90 * DEG_TO_RAD] # rad / s
 # RADIAN_SHIFT = [10 * DEG_TO_RAD] #, 20 * DEG_TO_RAD, 30 * DEG_TO_RAD]
-MAX_RADIANS = 60 * math.pi / 180
+MAX_RADIANS = 90 * math.pi / 180
 
 crc = CRC()
 
@@ -54,9 +54,9 @@ def move_to_initial_pose(cmd, pub, motors, target_positions):
                 intermediate_target = min(latest_joint_states[go2.LegID[name]].q + DEFAULT_RAMP_RATE * PUB_PERIOD * period_count, target_positions[name])
             cmd.motor_cmd[go2.LegID[name]].mode = 0x01
             cmd.motor_cmd[go2.LegID[name]].q = intermediate_target
-            cmd.motor_cmd[go2.LegID[name]].kp = 10.0
+            cmd.motor_cmd[go2.LegID[name]].kp = 20.0
             cmd.motor_cmd[go2.LegID[name]].dq = 0.0
-            cmd.motor_cmd[go2.LegID[name]].kd = 1.0
+            cmd.motor_cmd[go2.LegID[name]].kd = 0.5
             cmd.motor_cmd[go2.LegID[name]].tau = 0.0
 
         cmd.crc = crc.Crc(cmd)
@@ -88,9 +88,9 @@ def move_to_initial_pose(cmd, pub, motors, target_positions):
     for name in motors:
         cmd.motor_cmd[go2.LegID[name]].mode = 0x01
         cmd.motor_cmd[go2.LegID[name]].q = target_positions[motor]
-        cmd.motor_cmd[go2.LegID[name]].kp = 10.0 
+        cmd.motor_cmd[go2.LegID[name]].kp = 20.0 
         cmd.motor_cmd[go2.LegID[name]].dq = 0.0
-        cmd.motor_cmd[go2.LegID[name]].kd = 1.0
+        cmd.motor_cmd[go2.LegID[name]].kd = 0.5
         cmd.motor_cmd[go2.LegID[name]].tau = 0.0
 
     print("Finished setting motors to initial position.")
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     for motor in motors_to_control:
         limits = go2.JOINT_LIMITS[motor]
         print(f"Changing {target_positions[motor]}")
-        target_positions[motor] = limits[0] + 20 * DEG_TO_RAD
+        target_positions[motor] = limits[0] + 10 * DEG_TO_RAD
         print(f"to {target_positions[motor]}")
 
     # sets first position to q=0
