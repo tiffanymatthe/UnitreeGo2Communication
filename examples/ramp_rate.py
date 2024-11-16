@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     print("Closed pub and sub.")
 
-    log_file = "ramp1_" + "_".join(motors_to_control) + ".pkl"
+    log_file = "ramp_rate_tests_nov_16/ramp1_" + "_".join(motors_to_control) + ".pkl"
     with open(log_file, 'wb') as f:
         pickle.dump(joint_command_log, f)
         pickle.dump(joint_state_log, f)
