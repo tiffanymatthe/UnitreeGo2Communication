@@ -27,7 +27,7 @@ You will need to run `pip3 install -e .` again if you change files in the `unitr
 
 Remember to `cd` back to this repository when running scripts.
 
-5. Install other packages. (None for the moment.)
+5. Install other packages. (None for the moment.) [onnx_runtime](https://onnxruntime.ai/docs/get-started/with-python.html)
 
 6. When running the scripts in examples, connect to the robot with an ethernet. First time connection requires setting up the network interface. See [network environment setup](https://support.unitree.com/home/en/developer/Quick_start) for details.
 
