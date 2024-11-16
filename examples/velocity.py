@@ -18,7 +18,7 @@ if __name__ == '__main__':
         ChannelFactoryInitialize(0)
 
     rsc = client_utils.get_robot_state_client()
-    client_utils.set_service(rsc, "sport_mode", False)
+    client_utils.set_service(rsc, "sport_mode", True)
 
     sub = ChannelSubscriber("rt/sportmodestate", SportModeState_)
 

@@ -25,20 +25,23 @@ DEFAULT_RAMP_RATE = 2 * math.pi / 180
 
 DEG_TO_RAD = math.pi / 180
 
-RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD, 90 * DEG_TO_RAD] #, 90 * DEG_TO_RAD] # rad / s
+RAMP_RATES = [10 * DEG_TO_RAD,15 * DEG_TO_RAD, 25 * DEG_TO_RAD, 30 * DEG_TO_RAD, 45 * DEG_TO_RAD, 60 * DEG_TO_RAD, 70 * DEG_TO_RAD, 80 * DEG_TO_RAD]
 # RADIAN_SHIFT = [10 * DEG_TO_RAD] #, 20 * DEG_TO_RAD, 30 * DEG_TO_RAD]
-MAX_RADIANS = 90 * math.pi / 180
+MAX_RADIANS = 80 * math.pi / 180
 
 crc = CRC()
 
 joint_state_log = []
 joint_command_log = []
 
+NEGATE = True
+
 def read_joints(msg: LowState_):
     # thread-safety https://stackoverflow.com/a/18568017
     joint_state_log.append((time.time(), msg.motor_state))
 
 def move_to_initial_pose(cmd, pub, motors, target_positions):
+    pause_counts = 500
     while len(joint_state_log) == 0:
         print(f"Waiting for subscriber to get a data point.")
 
@@ -74,16 +77,19 @@ def move_to_initial_pose(cmd, pub, motors, target_positions):
         latest_joint_states = joint_state_log[-1][1]
         reached_target = True
         for motor in motors:
-            if not math.isclose(latest_joint_states[go2.LegID[motor]].q, target_positions[motor], abs_tol=0.15):
+            if not math.isclose(latest_joint_states[go2.LegID[motor]].q, target_positions[motor], abs_tol=0.1):
                 # print(f"Want {latest_joint_states[go2.LegID[motor]].q} to match {target_positions[motor]}")
                 reached_target = False
         if reached_target:
-            cmd.crc = crc.Crc(cmd)
-            if pub.Write(cmd):
-                joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
+            if pause_counts <= 0:
+                cmd.crc = crc.Crc(cmd)
+                if pub.Write(cmd):
+                    joint_command_log.append((time.time(), [x.q for x in cmd.motor_cmd]))
+                else:
+                    print("Waiting for subscriber.")
+                break
             else:
-                print("Waiting for subscriber.")
-            break
+                pause_counts -= 1
     
     for name in motors:
         cmd.motor_cmd[go2.LegID[name]].mode = 0x01
@@ -132,14 +138,17 @@ if __name__ == '__main__':
     hip_motors = ["RL_0", "RR_0", "FL_0", "FR_0"]
     move_to_initial_pose(cmd, pub, hip_motors, target_positions)
 
-    # motors_to_control = ["RL_2"] #, "RR_2", "FL_2", "FR_2"]
+    motors_to_control = ["RL_2", "RR_2", "FL_2"]
     # motors_to_control = ["RL_1"] #, "RR_1", "FL_1", "FR_1"]
-    motors_to_control = ["RR_0"] #, "RR_0", "FL_0", "FR_0"]
+    # motors_to_control = ["FR_2"] #, "RR_0", "FL_0", "FR_0"]
 
     for motor in motors_to_control:
         limits = go2.JOINT_LIMITS[motor]
         print(f"Changing {target_positions[motor]}")
-        target_positions[motor] = limits[0] + 10 * DEG_TO_RAD
+        if NEGATE:
+            target_positions[motor] = limits[1] - 10 * DEG_TO_RAD
+        else:
+            target_positions[motor] = limits[0] + 10 * DEG_TO_RAD
         print(f"to {target_positions[motor]}")
 
     # sets first position to q=0
@@ -154,6 +163,8 @@ if __name__ == '__main__':
 
     print(f"Starting test.")
 
+    hold_count = 500
+
     while True:
         current_time = time.perf_counter()
         elapsed_time = current_time - start_time
@@ -161,7 +172,10 @@ if __name__ == '__main__':
         if elapsed_time >= PUB_PERIOD * (period_index + 1):
             for motor in motors_to_control:
                 change_in_q = RAMP_RATES[ramp_index] * PUB_PERIOD * period_index
-                cmd.motor_cmd[go2.LegID[motor]].q = min(target_positions[motor] + change_in_q, go2.JOINT_LIMITS[motor][1])
+                if NEGATE:
+                    cmd.motor_cmd[go2.LegID[motor]].q = max(max(target_positions[motor] - change_in_q, go2.JOINT_LIMITS[motor][0]),-MAX_RADIANS + target_positions[motor] - 10 * DEG_TO_RAD)
+                else:
+                    cmd.motor_cmd[go2.LegID[motor]].q = min(min(target_positions[motor] + change_in_q, go2.JOINT_LIMITS[motor][1]),MAX_RADIANS + target_positions[motor] + 10 * DEG_TO_RAD)
                 # print(f"Sending {min(target_positions[motor] + change_in_q, go2.JOINT_LIMITS[motor][1])}")
 
             cmd.crc = crc.Crc(cmd)
@@ -175,16 +189,23 @@ if __name__ == '__main__':
             latest_joint_states = joint_state_log[-1][1]
             reached_target = True
             for motor in motors_to_control:
-                if latest_joint_states[go2.LegID[motor]].q < min(MAX_RADIANS + target_positions[motor], go2.JOINT_LIMITS[motor][1]):
+                if (
+                    (NEGATE and latest_joint_states[go2.LegID[motor]].q > max(-MAX_RADIANS + target_positions[motor], go2.JOINT_LIMITS[motor][0]))
+                    or (not NEGATE and latest_joint_states[go2.LegID[motor]].q < min(MAX_RADIANS + target_positions[motor], go2.JOINT_LIMITS[motor][1]))
+                ):
                     reached_target = False
                     # print(f"{latest_joint_states[go2.LegID[motor]].q} < {MAX_RADIANS + target_positions[motor]}, {go2.JOINT_LIMITS[motor][1]}")
             if reached_target:
+                # if hold_count <= 0:
+                hold_count = 500
                 ramp_index += 1
                 period_index = -1
                 print(f"Changing shift.")
                 move_to_initial_pose(cmd, pub, motors_to_control, target_positions)
                 if ramp_index >= len(RAMP_RATES):
                     break
+                # else:
+                #     hold_count -= 1
             
             period_index += 1
         # Update next_time and sleep for the remaining time
@@ -201,6 +222,6 @@ if __name__ == '__main__':
     with open(log_file, 'wb') as f:
         pickle.dump(joint_command_log, f)
         pickle.dump(joint_state_log, f)
-        pickle.dump({"ramp_rates": RAMP_RATES, "pub_freq": PUB_FREQ, "max_radians": MAX_RADIANS},f)
+        pickle.dump({"ramp_rates": RAMP_RATES, "pub_freq": PUB_FREQ, "max_radians": MAX_RADIANS, "negate": NEGATE, "target_positions": target_positions},f)
 
     print(f"Saved to {log_file}")

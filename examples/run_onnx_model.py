@@ -15,7 +15,7 @@ import utils.client_utils as client_utils
 import utils.publisher_utils as pub_utils
 import utils.isaacgym_utils as isaac_utils
 
-import onnx
+# import onnx
 import onnxruntime as ort
 
 from scipy.spatial.transform import Rotation as R
@@ -119,10 +119,10 @@ def read_joints(msg: LowState_):
     ]) # Format: (0-w, 1-x, 2-y, 3-z)
     observations["projected_gravity"] = projected_gravity_vector(imu_quaternion)
 
-    observations["cmd_vel"] = np.array([0,0,0])
+    observations["cmd_vel"] = np.array([0.5,0,0])
 
     observations["joint_pos_vel"] = get_joint_pos_vel(msg)
-    observations["init_raw_action"] = (observations["joint_pos_vel"][:12] - motor_qs_defaults) / SCALE_FACTOR
+    observations["init_raw_action"] = (np.array(observations["joint_pos_vel"][:12]) - np.array(motor_qs_defaults)) / SCALE_FACTOR
 
 def WirelessControllerHandler(msg: WirelessController_):
     global stop_program
@@ -243,6 +243,9 @@ if __name__ == '__main__':
     start_time = time.perf_counter()
     period_index = 0
 
+    while len(joint_state_log) == 0:
+        print(f"Waiting for subscriber to get a data point.")
+
     while True:
         current_time = time.perf_counter()
         elapsed_time = current_time - start_time
@@ -250,14 +253,17 @@ if __name__ == '__main__':
         if stop_program:
             # https://github.com/eppl-erau-db/go2_rl_ws/blob/146a64d9cec414ead91775fe2d43c722edc7c649/src/rl_deploy/src/go2_rl_control_cpp.cpp#L280
             for motor, id in go2.LegID.items():
-                cmd.motor_cmd[id].q = joint_state_log.motor_state[id].q
+                cmd.motor_cmd[id].q = joint_state_log[-1][1][id].q
                 cmd.motor_cmd[id].dq = 0.0
                 cmd.motor_cmd[id].kp = 40
                 cmd.motor_cmd[id].kd = 5
                 cmd.motor_cmd[id].tau = 0.0
 
             cmd.crc = crc.Crc(cmd)
-            pub.Write(cmd)
+            if not pub.Write(cmd):
+                print(f"Unable to publish cmd to damping!")
+            else:
+                pub_log.append((time.time(), cmd.motor_cmd))
 
             if not wrote_to_log_file:
                 log_file = "model_logs.pkl"
@@ -271,7 +277,7 @@ if __name__ == '__main__':
 
         if elapsed_time >= PUB_PERIOD * (period_index + 1):
             # run model
-            target_q = get_target_q()
+            target_q = get_target_q(ort_sess)
             for motor, id in go2.LegID.items():
                 cmd.motor_cmd[id].q = target_q[id]
                 cmd.motor_cmd[id].dq = 0.0

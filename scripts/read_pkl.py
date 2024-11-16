@@ -84,8 +84,8 @@ if __name__ == "__main__":
     #     "FR_1.pkl": ["FR_1"],
     #     "calves.pkl": ["RL_2", "RR_2", "FL_2", "FR_2"],
     # }
-    # motors_to_plot = ["RL_0", "RR_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FL_2", "FR_2"]
-    motors_to_plot = ["RL_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FR_2"]
+    motors_to_plot = ["RL_0", "RR_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FL_2", "FR_2"]
+    # motors_to_plot = ["FR_1"] # "RL_0", "FL_0", "FR_0","RL_1", "RR_1", "FL_1", "FR_1", "RL_2", "RR_2", "FR_2"]
 
     # key is motor, value is tuple of time and command
     commands_to_plot = defaultdict(lambda: [[], []])
@@ -93,10 +93,13 @@ if __name__ == "__main__":
     offsets = {}
     ramp_rates = {}
 
-    for motor in motors_to_plot: # pkl_file, motors in pkl_and_motors.items():
-        motors = [motor]
+    for motor2 in motors_to_plot: # pkl_file, motors in pkl_and_motors.items():
+        motors = [motor2]
         # pkl_file=f"ramp1_FR_0.pkl"
-        pkl_file=f"ramp1_{motor}.pkl"
+        if motor2 in {"RL_2", "RR_2", "FL_2"}:
+            pkl_file=f"ramp_rate_tests_nov_16/ramp1_RL_2_RR_2_FL_2.pkl"
+        else:
+            pkl_file=f"ramp_rate_tests_nov_16/ramp1_{motor2}.pkl"
         with (open(pkl_file, "rb")) as openfile:
             joint_commands = pickle.load(openfile)
             joint_states = pickle.load(openfile)
@@ -108,19 +111,21 @@ if __name__ == "__main__":
 
         time_offset = joint_commands[0][0]
         joint_command_times = [command[0] - time_offset for command in joint_commands]
-        for motor in motors:
-            commands_to_plot[motor][0] = joint_command_times
+        for motor1 in motors:
+            commands_to_plot[motor1][0] = joint_command_times
         for time_command in joint_commands:
-            for motor in motors:
-                commands_to_plot[motor][1].append(time_command[1][LegID[motor]])
+            for motor1 in motors:
+                commands_to_plot[motor1][1].append(time_command[1][LegID[motor1]])
 
         time_offset = joint_states[0][0]
         joint_state_times = [state[0] - time_offset for state in joint_states]
-        for motor in motors:
-            states_to_plot[motor][0] = joint_state_times
+        for motor1 in motors:
+            states_to_plot[motor1][0] = joint_state_times
         for time_state in joint_states:
-            for motor in motors:
-                states_to_plot[motor][1].append(time_state[1][LegID[motor]].q)
+            for motor1 in motors:
+                states_to_plot[motor1][1].append(time_state[1][LegID[motor1]].q)
+
+
 
     # command_time_diffs = np.diff(joint_command_times)
     # print(f"Publisher commands are separated by {np.mean(command_time_diffs)} seconds with variance {np.var(command_time_diffs)}. {1/np.mean(command_time_diffs)} Hz")
@@ -143,22 +148,38 @@ if __name__ == "__main__":
         joint_state = states_to_plot[motor][1]
         joint_state_time = states_to_plot[motor][0]
 
+        joint_state = np.array(joint_state)
+        joint_state_time = np.array(joint_state_time)
+
+        filter = joint_state <= 1e9
+        joint_state = joint_state[filter]
+        joint_state_time = joint_state_time[filter]
+
+
+        joint_cmd = np.array(joint_cmd)
+        joint_cmd_time = np.array(joint_cmd_time)
+
+        filter = joint_cmd <= 1e9
+        joint_cmd = joint_cmd[filter]
+        joint_cmd_time = joint_cmd_time[filter]
+
+
         # print(f"{motor}: Average publisher frequency: {frequency_stats(joint_cmd_time)}")
         # print(f"{motor}: Average subscriber frequency: {frequency_stats(joint_state_time)}")
 
         # print(f"{motor}: Min: {min(joint_state[10:]) * 180 / np.pi} and max: {max(joint_state[10:]) * 180 / np.pi}")
 
-        state_interp_func = interp1d(joint_state_time, joint_state, kind='linear', fill_value='extrapolate')  # Linear interpolation
-        state_interp = state_interp_func(joint_cmd_time)  # Resampled state signal
+        # state_interp_func = interp1d(joint_state_time, joint_state, kind='linear', fill_value='extrapolate')  # Linear interpolation
+        # state_interp = state_interp_func(joint_cmd_time)  # Resampled state signal
 
-        # Step 2: Perform cross-correlation to assess delay
-        correlation = np.correlate(joint_cmd - np.mean(joint_cmd), state_interp - np.mean(state_interp), mode='full')
-        delay_idx = np.argmax(correlation) - (len(joint_cmd_time) - 1)
-        time_delay = delay_idx * (joint_cmd_time[1] - joint_cmd_time[0])  # Time between samples
+        # # Step 2: Perform cross-correlation to assess delay
+        # correlation = np.correlate(joint_cmd - np.mean(joint_cmd), state_interp - np.mean(state_interp), mode='full')
+        # delay_idx = np.argmax(correlation) - (len(joint_cmd_time) - 1)
+        # time_delay = delay_idx * (joint_cmd_time[1] - joint_cmd_time[0])  # Time between samples
 
-        # print(f"{motor}: Estimated time delay: {time_delay} seconds")
+        # # print(f"{motor}: Estimated time delay: {time_delay} seconds")
 
-        joint_cmd = remove_spikes(joint_cmd)
+        # joint_cmd = remove_spikes(joint_cmd)
 
         # lags, cmd_crossings, state_crossings = get_lag(joint_cmd, joint_cmd_time, joint_state, joint_state_time, offsets[motor])
         # print(f"{motor}: lag times {lags}")
@@ -167,9 +188,6 @@ if __name__ == "__main__":
 
         # axs.flatten()[joint_idx].scatter(ramp_rates[motor], lags)
         # axs.flatten()[joint_idx].set_ylabel(f'Joint {motor} lag (s)')
-
-        if motor == "RL_0":
-            print(joint_state)
         
         # Plot joint command
         axs.flatten()[joint_idx].plot(joint_cmd_time, joint_cmd, label=f'Command', color='b')
