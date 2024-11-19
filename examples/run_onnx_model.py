@@ -24,6 +24,8 @@ PUB_FREQ = 50 # according to script
 PUB_PERIOD = 1/PUB_FREQ
 SCALE_FACTOR = 0.25
 
+SIT_POS = [-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6]
+
 KP = 20
 KD = 0.5
 
@@ -32,6 +34,7 @@ crc = CRC()
 joint_state_log = []
 pub_log = []
 stop_program = False
+sit = False
 wrote_to_log_file = False
 
 observations = {
@@ -57,6 +60,25 @@ motor_qs_defaults = [
     -1.8,
     -1.8,
     -1.8,
+]
+
+key_state = [
+    ["R1", 0],
+    ["L1", 0],
+    ["start", 0],
+    ["select", 0],
+    ["R2", 0],
+    ["L2", 0],
+    ["F1", 0],
+    ["F2", 0],
+    ["A", 0],
+    ["B", 0],
+    ["X", 0],
+    ["Y", 0],
+    ["up", 0],
+    ["right", 0],
+    ["down", 0],
+    ["left", 0],
 ]
 
 def projected_gravity_vector(imu_quaternion):
@@ -126,9 +148,17 @@ def read_joints(msg: LowState_):
 
 def WirelessControllerHandler(msg: WirelessController_):
     global stop_program
-    if msg.keys == 512:
+    global sit
+
+    for i in range(16):
+        key_state[i][1] = (msg.keys & (1 << i)) >> i
+
+    if key_state[9][1] == 1: # key B
         print(f"Stop program!")
         stop_program = True
+    elif key_state[8][1] == 1:
+        print(f"Sit!")
+        sit = True
 
 def get_target_q(ort_session):
     obs = np.concatenate(
@@ -250,14 +280,21 @@ if __name__ == '__main__':
         current_time = time.perf_counter()
         elapsed_time = current_time - start_time
 
-        if stop_program:
+        if stop_program or sit:
             # https://github.com/eppl-erau-db/go2_rl_ws/blob/146a64d9cec414ead91775fe2d43c722edc7c649/src/rl_deploy/src/go2_rl_control_cpp.cpp#L280
             for motor, id in go2.LegID.items():
-                cmd.motor_cmd[id].q = joint_state_log[-1][1][id].q
-                cmd.motor_cmd[id].dq = 0.0
-                cmd.motor_cmd[id].kp = 40
-                cmd.motor_cmd[id].kd = 5
-                cmd.motor_cmd[id].tau = 0.0
+                if stop_program:
+                    cmd.motor_cmd[id].q = joint_state_log[-1][1][id].q
+                    cmd.motor_cmd[id].dq = 0.0
+                    cmd.motor_cmd[id].kp = 40
+                    cmd.motor_cmd[id].kd = 5
+                    cmd.motor_cmd[id].tau = 0.0
+                elif sit:
+                    cmd.motor_cmd[id].q = SIT_POS[id]
+                    cmd.motor_cmd[id].dq = 0.0
+                    cmd.motor_cmd[id].kp = 30
+                    cmd.motor_cmd[id].kd = 10
+                    cmd.motor_cmd[id].tau = 0.0
 
             cmd.crc = crc.Crc(cmd)
             if not pub.Write(cmd):
