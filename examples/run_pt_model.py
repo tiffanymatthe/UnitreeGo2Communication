@@ -15,6 +15,7 @@ import constants.unitree_legged_const as go2
 import utils.client_utils as client_utils
 import utils.publisher_utils as pub_utils
 import utils.isaacgym_utils as isaac_utils
+import examples.actor_critic as actor_critic
 
 from scipy.spatial.transform import Rotation as R
 
@@ -167,7 +168,7 @@ def WirelessControllerHandler(msg: WirelessController_):
 def get_target_q(model):
     obs = np.concatenate(
         (
-            torch.zeros(1,3),
+            [0,0,0],
             observations["base_ang_vel"],
             observations["projected_gravity"],
             observations["cmd_vel"],
@@ -184,9 +185,10 @@ def get_target_q(model):
 
     # Run inference
     try:
-        ort_outs = model(obs)
+        ort_outs = model.actor(torch.from_numpy(obs))
+        # print(obs)
         print(ort_outs)
-        observations["raw_actions"] = ort_outs[0].flatten()
+        observations["raw_actions"] = ort_outs[0].detach().numpy()
     except Exception as e:
         print(f"Inference failed: {e}")
         observations["raw_actions"] = np.zeros_like(observations["init_raw_action"])
@@ -208,6 +210,8 @@ def get_target_q(model):
         processed_actions[7],  # 10 -> RL_calf_joint  to RL_calf  -> 11
         processed_actions[8],   # 11 -> RR_calf_joint  to RR_calf  -> 8
     ]
+
+    print(f"{processed_actions}")
 
     # # Motor limits
     # motor_limits_ordered = [
@@ -240,6 +244,26 @@ def get_target_q(model):
 
 if __name__ == '__main__':
 
+    model_path = "models/model_1500.pt"
+
+    init_noise_std = 1.0
+    actor_hidden_dims = [512, 256, 128]
+    critic_hidden_dims = [512, 256, 128]
+
+    model = actor_critic.ActorCritic(
+        num_actor_obs=48,
+        num_critic_obs=48,
+        num_actions=12,
+        actor_hidden_dims=actor_hidden_dims,
+        critic_hidden_dims=critic_hidden_dims,
+        activation='elu',
+        init_noise_std=init_noise_std
+    )
+
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu'))['model_state_dict'])
+
+    model.eval()
+
     if len(sys.argv)>1:
         ChannelFactoryInitialize(0, sys.argv[1])
     else:
@@ -270,10 +294,6 @@ if __name__ == '__main__':
         cmd.motor_cmd[i].dq = go2.VelStopF
         cmd.motor_cmd[i].kd = 0
         cmd.motor_cmd[i].tau = 0
-
-    model_path = "models/something.pt"
-    model = torch.jit.load(model_path)
-    model.eval()
 
     start_time = time.perf_counter()
     period_index = 0
@@ -329,10 +349,10 @@ if __name__ == '__main__':
 
             cmd.crc = crc.Crc(cmd)
 
-            # if not pub.Write(cmd):
-            #     print(f"Unable to publish cmd!")
-            # else:
-            #     pub_log.append((time.time(), cmd.motor_cmd))
+            if not pub.Write(cmd):
+                print(f"Unable to publish cmd!")
+            else:
+                pub_log.append((time.time(), cmd.motor_cmd))
 
             period_index += 1
         else:
