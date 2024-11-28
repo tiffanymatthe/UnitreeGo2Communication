@@ -1,6 +1,3 @@
 __pycache__/
-<<<<<<< HEAD
 ramp_rate_tests_nov_16/*.pkl
-=======
 *.pkl
->>>>>>> b9683bb (add sit command)
