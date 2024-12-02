@@ -184,7 +184,8 @@ class ModelRunner:
                 self.reached_position = True
             self.position_percent = min(self.position_percent, 1)
             for i in range(12):
-                self.cmd.motor_cmd[i].q = (1 - self.position_percent) * self.start_position[i] + self.position_percent * self.target_position[i]
+                sim_index = self.state_estimator.joint_idxs[i]
+                self.cmd.motor_cmd[i].q = (1 - self.position_percent) * self.start_position[sim_index] + self.position_percent * self.target_position[sim_index]
                 self.cmd.motor_cmd[i].dq = 0
                 self.cmd.motor_cmd[i].kp = self.Kp
                 self.cmd.motor_cmd[i].kd = self.Kd
