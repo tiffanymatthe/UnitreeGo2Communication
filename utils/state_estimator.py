@@ -111,7 +111,7 @@ class StateEstimator:
                 msg.imu_state.quaternion[3]
             ])
 
-    def WirelessControllerHandler(self, msg: WirelessController_):
+    def _rc_command_cb(self, msg: WirelessController_):
         for i in range(16):
             self.key_state[i][1] = (msg.keys & (1 << i)) >> i
 

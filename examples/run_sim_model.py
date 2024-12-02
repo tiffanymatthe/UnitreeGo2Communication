@@ -15,10 +15,10 @@ from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import RecurrentThread
 
 class CmdMode:
-    TO_POSITION = 0
-    POLICY = 1
-    DAMP = 2
-    NONE = 3
+    NONE = 0
+    TO_POSITION = 1
+    POLICY = 2
+    DAMP = 3
 
 class normalization:
     class obs_scales:
@@ -87,6 +87,8 @@ class ModelRunner:
         self.position_percent = 0
         self.duration_s = 1
 
+        self.crc = CRC()
+
         self.joint_limits_list = list(go2.JOINT_LIMITS.values())
 
     def start(self):
@@ -99,8 +101,8 @@ class ModelRunner:
         print(f"Loading model: {model_path}")
 
         model = actor_critic.ActorCritic(
-            num_actor_obs=48,
-            num_critic_obs=48,
+            num_actor_obs=42,
+            num_critic_obs=42,
             num_actions=12,
             actor_hidden_dims=[512, 256, 128],
             critic_hidden_dims=[512, 256, 128],
@@ -115,24 +117,26 @@ class ModelRunner:
     def go_to_position(self, target_position):
         self.reached_position = False
         self.position_percent = 0
-        self.state_estimator.cmd_mode = CmdMode.TO_POSITION
         self.start_position = self.state_estimator.get_dof_pos()
         self.target_position = target_position
+        self.cmd_mode = CmdMode.TO_POSITION
+        print(f"Starting to go to position: {target_position}")
         while not self.reached_position:
             time.sleep(1/self.publisher_frequency)
+        print(f"Reached position {target_position}")
 
     def run_policy(self):
         runner.state_estimator.run_mode = se.RunMode.NORMAL
-        runner.state_estimator.cmd_mode = CmdMode.POLICY
+        runner.cmd_mode = CmdMode.POLICY
         while True:
             time.sleep(1/self.publisher_frequency / 4)
             if self.state_estimator.run_mode == se.RunMode.DAMP:
-                runner.state_estimator.cmd_mode = CmdMode.DAMP
+                runner.cmd_mode = CmdMode.DAMP
             elif self.state_estimator.run_mode == se.RunMode.SIT:
                 self.go_to_position(self.sit_pos)
                 # force program to go into damp mode afterwards
                 self.state_estimator.run_mode = se.RunMode.DAMP
-                runner.state_estimator.cmd_mode = CmdMode.DAMP
+                runner.cmd_mode = CmdMode.DAMP
 
     def get_observations(self):
         """
@@ -160,13 +164,13 @@ class ModelRunner:
         obs = np.concatenate((obs, self.raw_actions))
         obs = obs.astype(np.float32).reshape(1, -1)
 
-        obs = torch.clip(obs, -normalization.clip_observations, normalization.clip_observations)
+        obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
         return obs
 
     def LowCmdWrite(self):
-        if self.state_estimator.run_mode == CmdMode.NONE:
+        if self.cmd_mode == CmdMode.NONE:
             return
-        elif self.state_estimator.run_mode == CmdMode.DAMP:
+        elif self.cmd_mode == CmdMode.DAMP:
             dof_pos = self.state_estimator.get_dof_pos()
             for i in range(12):
                 self.cmd.motor_cmd[i].q = dof_pos[i]
@@ -174,8 +178,10 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].kp = 40
                 self.cmd.motor_cmd[i].kd = 5
                 self.cmd.motor_cmd[i].tau = 0.0
-        elif self.state_estimator.run_mode == CmdMode.TO_POSITION:
+        elif self.cmd_mode == CmdMode.TO_POSITION:
             self.position_percent += 1 / self.duration_s / self.publisher_frequency
+            if self.position_percent > 1:
+                self.reached_position = True
             self.position_percent = min(self.position_percent, 1)
             for i in range(12):
                 self.cmd.motor_cmd[i].q = (1 - self.position_percent) * self.start_position[i] + self.position_percent * self.target_position[i]
@@ -183,18 +189,17 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].kp = self.Kp
                 self.cmd.motor_cmd[i].kd = self.Kd
                 self.cmd.motor_cmd[i].tau = 0
-        elif self.state_estimator.run_mode == CmdMode.POLICY:
+        elif self.cmd_mode == CmdMode.POLICY:
             obs = self.get_observations()
             try:
                 output_actions = self.model.actor(torch.from_numpy(obs))
-                output_actions = torch.clip(output_actions, -normalization.clip_actions, normalization.clip_actions)
+                output_actions = torch.clamp(output_actions, -normalization.clip_actions, normalization.clip_actions)
                 self.raw_actions = output_actions[0].detach().numpy()
+                self.update_cmd_from_raw_actions(self.raw_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
-
-            self.update_cmd_from_raw_actions(output_actions)
         else:
-            raise NotImplementedError(f"{self.state_estimator.run_mode} run mode not implemented!")
+            raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.pub.Write(self.cmd)
@@ -214,9 +219,9 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/model_1500.pt"
+    model_path = "models/model_1000.pt"
     runner.load_pt_model(model_path)
-
+    runner.start()
     runner.go_to_position(runner.sit_pos)
 
     # start model loop
