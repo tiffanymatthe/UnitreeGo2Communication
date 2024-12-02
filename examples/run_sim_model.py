@@ -202,7 +202,7 @@ class ModelRunner:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
 
         self.cmd.crc = self.crc.Crc(self.cmd)
-        self.pub.Write(self.cmd)
+        # self.pub.Write(self.cmd)
 
     def update_cmd_from_raw_actions(self, output_actions):
         position_targets = output_actions * control.action_scale + self.default_dof_pos
