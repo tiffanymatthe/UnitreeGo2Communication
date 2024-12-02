@@ -5,6 +5,7 @@ State Estimator, modified from https://github.com/Teddy-Liao/walk-these-ways-go2
 import time as time
 import numpy as np
 import math
+import threading
 import constants.unitree_legged_const as go2
 from scipy.spatial.transform import Rotation as R
 
@@ -62,45 +63,53 @@ class StateEstimator:
             ["left", 0],
         ]
 
+        self.state_lock = threading.Lock()
+
     def get_body_angular_vel(self):
-        return self.body_ang_vel
+        with self.state_lock:
+            return self.body_ang_vel.copy()
 
     def get_gravity_vector(self):
-        rotation = R.from_quat(self.imu_quat)
-        gravity_vec_w = np.array([0.0, 0.0, -1.0])  # Gravity vector in world
-        gravity_proj = -1 * rotation.apply(gravity_vec_w)
-        return gravity_proj
+        with self.state_lock:
+            rotation = R.from_quat(self.imu_quat)
+            gravity_vec_w = np.array([0.0, 0.0, -1.0])  # Gravity vector in world
+            gravity_proj = -1 * rotation.apply(gravity_vec_w)
+            return gravity_proj
 
     def get_dof_pos(self):
-        return self.joint_pos[self.joint_idxs]
+        with self.state_lock:
+            return self.joint_pos[self.joint_idxs].copy()
 
     def get_dof_vel(self):
-        return self.joint_vel[self.joint_idxs]
+        with self.state_lock:
+            return self.joint_vel[self.joint_idxs].copy()
 
     def get_tau_est(self):
-        return self.tau_est[self.joint_idxs]
+        with self.state_lock():
+            return self.tau_est[self.joint_idxs].copy()
 
     def _legdata_imu_cb(self, msg: LowState_):
         if not self.received_first_legdata:
             self.received_first_legdata = True
             print(f"First legdata: {time.time() - self.init_time}s after initialization.")
 
-        self.joint_pos = np.array(msg.motor_state.q)
-        self.joint_vel = np.array(msg.motor_state.qd)
-        self.tau_est = np.array(msg.motor_state.tau_est)
+        with self.state_lock:
+            self.joint_pos = np.array(msg.motor_state.q)
+            self.joint_vel = np.array(msg.motor_state.qd)
+            self.tau_est = np.array(msg.motor_state.tau_est)
 
-        self.body_ang_vel = np.array([
-            msg.imu_state.gyroscope[0],
-            msg.imu_state.gyroscope[1],
-            msg.imu_state.gyroscope[2]
-        ])
+            self.body_ang_vel = np.array([
+                msg.imu_state.gyroscope[0],
+                msg.imu_state.gyroscope[1],
+                msg.imu_state.gyroscope[2]
+            ])
 
-        self.imu_quat = np.array([
-            msg.imu_state.quaternion[0],
-            msg.imu_state.quaternion[1],
-            msg.imu_state.quaternion[2],
-            msg.imu_state.quaternion[3]
-        ])
+            self.imu_quat = np.array([
+                msg.imu_state.quaternion[0],
+                msg.imu_state.quaternion[1],
+                msg.imu_state.quaternion[2],
+                msg.imu_state.quaternion[3]
+            ])
 
     def WirelessControllerHandler(self, msg: WirelessController_):
         for i in range(16):

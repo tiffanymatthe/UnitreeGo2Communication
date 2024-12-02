@@ -69,6 +69,8 @@ class ModelRunner:
             self.cmd.motor_cmd[i].tau = 0
 
         self.model = None
+        self.state_estimator = se.StateEstimator()
+
         self.Kp = control.stiffness["joint"]
         self.Kd = control.damping["joint"]
         self.publisher_frequency = publisher_frequency
@@ -77,7 +79,6 @@ class ModelRunner:
         # in sim order
         self.sit_pos = self.sit_pos[self.state_estimator.joint_idxs]
         self.default_dof_pos = self.sit_pos # used in unitree_rl_gym for initialization
-        self.state_estimator = se.StateEstimator()
         self.cmd_mode = CmdMode.NONE
         self.raw_actions = None
         self.start_position = None
@@ -216,7 +217,6 @@ if __name__ == '__main__':
     model_path = "models/model_1500.pt"
     runner.load_pt_model(model_path)
 
-    # start by hanging position from sit (TODO: persist command)
     runner.go_to_position(runner.sit_pos)
 
     # start model loop
