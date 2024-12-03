@@ -33,8 +33,8 @@ def get_obs(se: StateEstimator):
     base_ang_vel = se.body_ang_vel
     projected_gravity = se.get_gravity_vector()
     commands = ...
-    dof_pos = se.get_dof_pos()
-    dof_vel = se.get_dof_vel()
+    dof_pos = se.get_dof_pos_in_sim()
+    dof_vel = se.get_dof_vel_in_sim()
     actions = ...
 
 if __name__ == '__main__':

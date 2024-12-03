@@ -26,11 +26,12 @@ class StateEstimator:
         
         # mapping from real joints to simulation dof pos order
         # actually goes both ways for this particular array
-        self.joint_idxs = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
+        self.joint_idxs_sim_to_real = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
+        self.joint_idxs_real_to_sim = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
 
-        self.joint_pos = np.zeros(12)
-        self.joint_vel = np.zeros(12)
-        self.tau_est = np.zeros(12)
+        self.joint_pos_in_real = np.zeros(12)
+        self.joint_vel_in_real = np.zeros(12)
+        self.tau_est_in_real = np.zeros(12)
         self.body_ang_vel = np.zeros(3)
         self.imu_quat = np.zeros(4)
 
@@ -76,17 +77,17 @@ class StateEstimator:
             gravity_proj = -1 * rotation.apply(gravity_vec_w)
             return gravity_proj
 
-    def get_dof_pos(self):
+    def get_dof_pos_in_sim(self):
         with self.state_lock:
-            return self.joint_pos[self.joint_idxs].copy()
+            return self.joint_pos_in_real[self.joint_idxs_real_to_sim].copy()
 
-    def get_dof_vel(self):
+    def get_dof_vel_in_sim(self):
         with self.state_lock:
-            return self.joint_vel[self.joint_idxs].copy()
+            return self.joint_vel_in_real[self.joint_idxs_real_to_sim].copy()
 
-    def get_tau_est(self):
+    def get_tau_est_in_sim(self):
         with self.state_lock():
-            return self.tau_est[self.joint_idxs].copy()
+            return self.tau_est_in_real[self.joint_idxs_real_to_sim].copy()
 
     def _legdata_imu_cb(self, msg: LowState_):
         if not self.received_first_legdata:
@@ -94,9 +95,9 @@ class StateEstimator:
             print(f"First legdata: {time.time() - self.init_time}s after initialization.")
 
         with self.state_lock:
-            self.joint_pos = np.array(msg.motor_state.q)
-            self.joint_vel = np.array(msg.motor_state.qd)
-            self.tau_est = np.array(msg.motor_state.tau_est)
+            self.joint_pos_in_real = np.array(msg.motor_state.q)
+            self.joint_vel_in_real = np.array(msg.motor_state.qd)
+            self.tau_est_in_real = np.array(msg.motor_state.tau_est)
 
             self.body_ang_vel = np.array([
                 msg.imu_state.gyroscope[0],

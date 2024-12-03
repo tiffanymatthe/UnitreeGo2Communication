@@ -2,6 +2,8 @@ import torch
 import sys
 import numpy as np
 import time
+import copy
+import pickle
 
 import constants.unitree_legged_const as go2
 import examples.actor_critic as actor_critic
@@ -75,21 +77,23 @@ class ModelRunner:
         self.Kd = control.damping["joint"]
         self.publisher_frequency = publisher_frequency
         # in real joint order
-        self.sit_pos = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
+        sit_pos_in_real = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
         # in sim order
-        self.sit_pos = self.sit_pos[self.state_estimator.joint_idxs]
-        self.default_dof_pos = self.sit_pos # used in unitree_rl_gym for initialization
+        self.sit_pos_in_sim = sit_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
+        self.default_dof_pos_in_sim = self.sit_pos_in_sim # used in unitree_rl_gym for initialization
         self.cmd_mode = CmdMode.NONE
-        self.raw_actions = None
-        self.start_position = None
-        self.target_position = None
+        self.raw_actions_in_sim = None
+        self.start_position_in_sim = None
+        self.target_position_in_sim = None
         self.reached_position = False
         self.position_percent = 0
         self.duration_s = 1
 
+        self.all_cmds = []
+
         self.crc = CRC()
 
-        self.joint_limits_list = list(go2.JOINT_LIMITS.values())
+        self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
 
     def start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
@@ -114,16 +118,16 @@ class ModelRunner:
         model.eval()
         self.model = model
 
-    def go_to_position(self, target_position):
+    def go_to_position(self, target_position_in_sim):
         self.reached_position = False
         self.position_percent = 0
-        self.start_position = self.state_estimator.get_dof_pos()
-        self.target_position = target_position
+        self.start_position_in_sim = self.state_estimator.get_dof_pos_in_sim()
+        self.target_position_in_sim = target_position_in_sim
         self.cmd_mode = CmdMode.TO_POSITION
-        print(f"Starting to go to position: {target_position}")
+        print(f"Starting to go to position in sim: {target_position_in_sim}")
         while not self.reached_position:
             time.sleep(1/self.publisher_frequency)
-        print(f"Reached position {target_position}")
+        print(f"Reached position in sim {target_position_in_sim}")
 
     def run_policy(self):
         runner.state_estimator.run_mode = se.RunMode.NORMAL
@@ -133,7 +137,7 @@ class ModelRunner:
             if self.state_estimator.run_mode == se.RunMode.DAMP:
                 runner.cmd_mode = CmdMode.DAMP
             elif self.state_estimator.run_mode == se.RunMode.SIT:
-                self.go_to_position(self.sit_pos)
+                self.go_to_position(self.sit_pos_in_sim)
                 # force program to go into damp mode afterwards
                 self.state_estimator.run_mode = se.RunMode.DAMP
                 runner.cmd_mode = CmdMode.DAMP
@@ -152,28 +156,30 @@ class ModelRunner:
             (
                 self.state_estimator.get_body_angular_vel() * normalization.obs_scales.ang_vel,
                 self.state_estimator.get_gravity_vector(),
-                (self.state_estimator.get_dof_pos() - self.default_dof_pos) * normalization.obs_scales.dof_pos,
-                self.state_estimator.get_dof_vel() * normalization.obs_scales.dof_vel,
+                (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
+                self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
             )
         )
 
-        if self.raw_actions is None:
+        if self.raw_actions_in_sim is None:
             # check ordering
-            self.raw_actions = (self.state_estimator.get_dof_pos() - self.default_dof_pos) / control.action_scale
+            self.raw_actions_in_sim = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / control.action_scale
 
-        obs = np.concatenate((obs, self.raw_actions))
+        obs = np.concatenate((obs, self.raw_actions_in_sim))
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
+
         return obs
 
     def LowCmdWrite(self):
         if self.cmd_mode == CmdMode.NONE:
             return
         elif self.cmd_mode == CmdMode.DAMP:
-            dof_pos = self.state_estimator.get_dof_pos()
+            dof_pos_in_sim = self.state_estimator.get_dof_pos_in_sim()
             for i in range(12):
-                self.cmd.motor_cmd[i].q = dof_pos[i]
+                sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
+                self.cmd.motor_cmd[i].q = dof_pos_in_sim[sim_index]
                 self.cmd.motor_cmd[i].dq = 0.0
                 self.cmd.motor_cmd[i].kp = 40
                 self.cmd.motor_cmd[i].kd = 5
@@ -184,8 +190,8 @@ class ModelRunner:
                 self.reached_position = True
             self.position_percent = min(self.position_percent, 1)
             for i in range(12):
-                sim_index = self.state_estimator.joint_idxs[i]
-                self.cmd.motor_cmd[i].q = (1 - self.position_percent) * self.start_position[sim_index] + self.position_percent * self.target_position[sim_index]
+                sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
+                self.cmd.motor_cmd[i].q = (1 - self.position_percent) * self.start_position_in_sim[sim_index] + self.position_percent * self.target_position_in_sim[sim_index]
                 self.cmd.motor_cmd[i].dq = 0
                 self.cmd.motor_cmd[i].kp = self.Kp
                 self.cmd.motor_cmd[i].kd = self.Kd
@@ -193,23 +199,24 @@ class ModelRunner:
         elif self.cmd_mode == CmdMode.POLICY:
             obs = self.get_observations()
             try:
-                output_actions = self.model.actor(torch.from_numpy(obs))
-                output_actions = torch.clamp(output_actions, -normalization.clip_actions, normalization.clip_actions)
-                self.raw_actions = output_actions[0].detach().numpy()
-                self.update_cmd_from_raw_actions(self.raw_actions)
+                output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
+                output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
+                self.raw_actions_in_sim = output_actions_in_sim[0].detach().numpy()
+                self.update_cmd_from_raw_actions(self.raw_actions_in_sim)
             except Exception as e:
                 print(f"Inference failed. {e}")
         else:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
 
         self.cmd.crc = self.crc.Crc(self.cmd)
+        self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
         # self.pub.Write(self.cmd)
 
-    def update_cmd_from_raw_actions(self, output_actions):
-        position_targets = output_actions * control.action_scale + self.default_dof_pos
+    def update_cmd_from_raw_actions(self, output_actions_in_sim):
+        position_targets = output_actions_in_sim * control.action_scale + self.default_dof_pos_in_sim
         for i in range(12):
-            q = position_targets[self.state_estimator.joint_idxs[i]]
-            q = max(min(q, self.joint_limits_list[i][1]), self.joint_limits_list[i][0])
+            q = position_targets[self.state_estimator.joint_idxs_real_to_sim[i]]
+            q = max(min(q, self.joint_limits_in_real_list[i][1]), self.joint_limits_in_real_list[i][0])
             self.cmd.motor_cmd[i].q = q
             self.cmd.motor_cmd[i].dq = 0
             self.cmd.motor_cmd[i].kp = self.Kp
@@ -223,9 +230,16 @@ if __name__ == '__main__':
     model_path = "models/model_1000.pt"
     runner.load_pt_model(model_path)
     runner.start()
-    runner.go_to_position(runner.sit_pos)
 
-    # start model loop
-    runner.run_policy()
+    try:
+        runner.go_to_position(runner.sit_pos_in_sim)
+
+        # start model loop
+        runner.run_policy()
+    except KeyboardInterrupt:
+        print("Program interrupted! Saving all_cmds to 'all_cmds.pkl'.")
+        with open('all_cmds.pkl', 'wb') as f:
+            pickle.dump(runner.all_cmds, f)
+        print(f"Saved {len(runner.all_cmds)} commands to 'all_cmds.pkl'.")
 
     # use this to publish consistently: example/go2/low_level/go2_stand_example.py
