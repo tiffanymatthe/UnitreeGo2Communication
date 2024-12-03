@@ -87,9 +87,10 @@ class ModelRunner:
         self.target_position_in_sim = None
         self.reached_position = False
         self.position_percent = 0
-        self.duration_s = 1
+        self.duration_s = 5
 
         self.all_cmds = []
+        self.all_obs = []
 
         self.crc = CRC()
 
@@ -122,11 +123,12 @@ class ModelRunner:
         self.reached_position = False
         self.position_percent = 0
         self.start_position_in_sim = self.state_estimator.get_dof_pos_in_sim()
+        print(self.start_position_in_sim)
         self.target_position_in_sim = target_position_in_sim
         self.cmd_mode = CmdMode.TO_POSITION
         print(f"Starting to go to position in sim: {target_position_in_sim}")
         while not self.reached_position:
-            time.sleep(1/self.publisher_frequency)
+            time.sleep(1/self.publisher_frequency/4)
         print(f"Reached position in sim {target_position_in_sim}")
 
     def run_policy(self):
@@ -154,8 +156,8 @@ class ModelRunner:
         """
         obs = np.concatenate(
             (
-                self.state_estimator.get_body_angular_vel() * normalization.obs_scales.ang_vel,
-                self.state_estimator.get_gravity_vector(),
+                self.state_estimator.get_body_angular_vel() * 0, # normalization.obs_scales.ang_vel,
+                self.state_estimator.get_gravity_vector() * 0,
                 (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
                 self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
             )
@@ -169,7 +171,7 @@ class ModelRunner:
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
-
+        self.all_obs.append(obs)
         return obs
 
     def LowCmdWrite(self):
@@ -186,12 +188,13 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].tau = 0.0
         elif self.cmd_mode == CmdMode.TO_POSITION:
             self.position_percent += 1 / self.duration_s / self.publisher_frequency
-            if self.position_percent > 1:
+            if self.position_percent > 1.5:
                 self.reached_position = True
-            self.position_percent = min(self.position_percent, 1)
+            # self.position_percent = min(self.position_percent, 1)
             for i in range(12):
                 sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
-                self.cmd.motor_cmd[i].q = (1 - self.position_percent) * self.start_position_in_sim[sim_index] + self.position_percent * self.target_position_in_sim[sim_index]
+                position_percent = min(self.position_percent, 1)
+                self.cmd.motor_cmd[i].q = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
                 self.cmd.motor_cmd[i].dq = 0
                 self.cmd.motor_cmd[i].kp = self.Kp
                 self.cmd.motor_cmd[i].kd = self.Kd
@@ -210,7 +213,7 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        # self.pub.Write(self.cmd)
+        self.pub.Write(self.cmd)
 
     def update_cmd_from_raw_actions(self, output_actions_in_sim):
         position_targets = output_actions_in_sim * control.action_scale + self.default_dof_pos_in_sim
@@ -227,7 +230,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/model_1000.pt"
+    model_path = "models/model_500.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
@@ -235,11 +238,18 @@ if __name__ == '__main__':
         runner.go_to_position(runner.sit_pos_in_sim)
 
         # start model loop
+        print(f"Running policy")
         runner.run_policy()
     except KeyboardInterrupt:
         print("Program interrupted! Saving all_cmds to 'all_cmds.pkl'.")
         with open('all_cmds.pkl', 'wb') as f:
             pickle.dump(runner.all_cmds, f)
         print(f"Saved {len(runner.all_cmds)} commands to 'all_cmds.pkl'.")
+
+    print("Program finished! Saving all_cmds to 'all_cmds_finished.pkl'.")
+    with open('all_cmds_finished.pkl', 'wb') as f:
+        pickle.dump(runner.all_cmds, f)
+        pickle.dump(runner.all_obs, f)
+    print(f"Saved {len(runner.all_cmds)} commands to 'all_cmds_finished.pkl'.")
 
     # use this to publish consistently: example/go2/low_level/go2_stand_example.py

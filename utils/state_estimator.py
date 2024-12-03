@@ -23,7 +23,7 @@ class RunMode:
 
 class StateEstimator:
     def __init__(self):
-        
+        self.state_lock = threading.Lock()
         # mapping from real joints to simulation dof pos order
         # actually goes both ways for this particular array
         self.joint_idxs_sim_to_real = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
@@ -64,8 +64,6 @@ class StateEstimator:
             ["left", 0],
         ]
 
-        self.state_lock = threading.Lock()
-
     def get_body_angular_vel(self):
         with self.state_lock:
             return self.body_ang_vel.copy()
@@ -95,9 +93,9 @@ class StateEstimator:
             print(f"First legdata: {time.time() - self.init_time}s after initialization.")
 
         with self.state_lock:
-            self.joint_pos_in_real = np.array(msg.motor_state.q)
-            self.joint_vel_in_real = np.array(msg.motor_state.qd)
-            self.tau_est_in_real = np.array(msg.motor_state.tau_est)
+            self.joint_pos_in_real = np.array([x.q for x in msg.motor_state])
+            self.joint_vel_in_real = np.array([x.dq for x in msg.motor_state])
+            self.tau_est_in_real = np.array([x.tau_est for x in msg.motor_state])
 
             self.body_ang_vel = np.array([
                 msg.imu_state.gyroscope[0],
@@ -126,3 +124,11 @@ class StateEstimator:
     def close(self):
         self.low_state_subscription.Close()
         self.rc_command_subscription.Close()
+
+
+# if __name__ == "__main__":
+#     quat = [-2.7649e-11,  2.5186e-10, -2.2529e-11,  1.0000e+00]
+#     grav_vec = [0.,  0., -1.]
+#     rotation = R.from_quat(quat)
+#     gravity_proj = -1 * rotation.apply(grav_vec)
+#     print(gravity_proj)
