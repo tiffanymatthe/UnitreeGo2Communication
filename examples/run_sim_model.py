@@ -228,9 +228,9 @@ class ModelRunner:
 
 if __name__ == '__main__':
 
-    runner = ModelRunner(publisher_frequency=250)
+    runner = ModelRunner(publisher_frequency=50)
 
-    model_path = "models/model_500.pt"
+    model_path = "models/model_600_1_neg_4_one_leg.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
