@@ -242,10 +242,13 @@ def get_target_q(model):
         max_limit = max_limit * 0.95
         clipped_actions_ordered[i] = max(min(action, max_limit), min_limit)
 
-        # also limit change in joint angle (limit to let's say 20 rad/s)
+        # also limit change in joint angle (limit to let's say 10 rad/s?)
+        # graph showed by Lukas shows fastest slope at 24 rad/s
+        print(f"ANGLES BEFORE CLIPPING: {clipped_actions_ordered}")
         if PREV_TARGET_Q is not None and PREV_TARGET_Q_TIME is not None:
-            max_angle_change = 20 * (time.time() - PREV_TARGET_Q_TIME)
+            max_angle_change = 10 * (time.time() - PREV_TARGET_Q_TIME)
             clipped_actions_ordered[i] = min(max(clipped_actions_ordered[i], PREV_TARGET_Q[i] -max_angle_change), PREV_TARGET_Q[i] +max_angle_change)
+        print(f"ANGLES AFTER CLIPPING: {clipped_actions_ordered}")
 
     # https://github.com/eppl-erau-db/go2_rl_ws/blob/146a64d9cec414ead91775fe2d43c722edc7c649/src/rl_deploy/src/go2_rl_control_cpp.cpp#L256
     return clipped_actions_ordered
@@ -330,10 +333,10 @@ if __name__ == '__main__':
                     cmd.motor_cmd[id].tau = 0.0
 
             cmd.crc = crc.Crc(cmd)
-            if not pub.Write(cmd):
-                print(f"Unable to publish cmd to damping!")
-            else:
-                pub_log.append((time.time(), cmd.motor_cmd))
+            # if not pub.Write(cmd):
+            #     print(f"Unable to publish cmd to damping!")
+            # else:
+            #     pub_log.append((time.time(), cmd.motor_cmd))
 
             if not wrote_to_log_file:
                 log_file = "model_logs.pkl"

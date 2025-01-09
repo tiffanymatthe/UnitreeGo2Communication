@@ -92,6 +92,9 @@ class ModelRunner:
         self.all_cmds = []
         self.all_obs = []
 
+        self.prev_position_target = None
+        self.prev_position_target_time = None
+
         self.crc = CRC()
 
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
@@ -213,10 +216,23 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        self.pub.Write(self.cmd)
+        # self.pub.Write(self.cmd)
+
+    def limit_change_in_position_target(self, position_targets):
+        print(f"Before limiting joint changes: {position_targets}")
+        if self.prev_position_target is not None and self.prev_position_target_time is not None:
+            max_angle_change = 10 * (time.time() - self.prev_position_target_time)
+            for i in range(12):
+                position_targets[i] = min(max(position_targets[i], self.prev_position_target[i] - max_angle_change), self.prev_position_target[i] + max_angle_change)
+        print(f"After limiting joint changes: {position_targets}")
+
+        self.prev_position_target = position_targets
+        self.prev_position_target_time = time.time()
 
     def update_cmd_from_raw_actions(self, output_actions_in_sim):
         position_targets = output_actions_in_sim * control.action_scale + self.default_dof_pos_in_sim
+        self.limit_change_in_position_target(position_targets)
+
         for i in range(12):
             q = position_targets[self.state_estimator.joint_idxs_real_to_sim[i]]
             q = max(min(q, self.joint_limits_in_real_list[i][1]), self.joint_limits_in_real_list[i][0])
