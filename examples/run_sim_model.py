@@ -216,16 +216,15 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        if self.cmd_mode != CmdMode.POLICY:
-            self.pub.Write(self.cmd)
+        self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
-        print(f"Before limiting joint changes: {position_targets}")
+        # print(f"Before limiting joint changes: {position_targets}")
         if self.prev_position_target is not None and self.prev_position_target_time is not None:
-            max_angle_change = 10 * (time.time() - self.prev_position_target_time)
+            max_angle_change = 30 * np.pi/ 180 * (time.time() - self.prev_position_target_time)
             for i in range(12):
                 position_targets[i] = min(max(position_targets[i], self.prev_position_target[i] - max_angle_change), self.prev_position_target[i] + max_angle_change)
-        print(f"After limiting joint changes: {position_targets}")
+        # print(f"After limiting joint changes: {position_targets}")
 
         self.prev_position_target = position_targets
         self.prev_position_target_time = time.time()
@@ -245,9 +244,9 @@ class ModelRunner:
 
 if __name__ == '__main__':
 
-    runner = ModelRunner(publisher_frequency=50)
+    runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/model_600_1_neg_4_one_leg.pt"
+    model_path = "models/model_500.pt" #50_single_joint_rl_test.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
