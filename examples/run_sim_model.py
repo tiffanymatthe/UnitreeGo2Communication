@@ -216,7 +216,8 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        # self.pub.Write(self.cmd)
+        if self.cmd_mode != CmdMode.POLICY:
+            self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
         print(f"Before limiting joint changes: {position_targets}")
