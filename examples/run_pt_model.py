@@ -36,6 +36,9 @@ stop_program = False
 sit = False
 wrote_to_log_file = False
 
+PREV_TARGET_Q = None
+PREV_TARGET_Q_TIME = None
+
 observations = {
     "base_ang_vel": None,
     "projected_gravity": None,
@@ -239,6 +242,11 @@ def get_target_q(model):
         max_limit = max_limit * 0.95
         clipped_actions_ordered[i] = max(min(action, max_limit), min_limit)
 
+        # also limit change in joint angle (limit to let's say 20 rad/s)
+        if PREV_TARGET_Q is not None and PREV_TARGET_Q_TIME is not None:
+            max_angle_change = 20 * (time.time() - PREV_TARGET_Q_TIME)
+            clipped_actions_ordered[i] = min(max(clipped_actions_ordered[i], PREV_TARGET_Q[i] -max_angle_change), PREV_TARGET_Q[i] +max_angle_change)
+
     # https://github.com/eppl-erau-db/go2_rl_ws/blob/146a64d9cec414ead91775fe2d43c722edc7c649/src/rl_deploy/src/go2_rl_control_cpp.cpp#L256
     return clipped_actions_ordered
 
@@ -340,6 +348,8 @@ if __name__ == '__main__':
         if elapsed_time >= PUB_PERIOD * (period_index + 1):
             # run model
             target_q = get_target_q(model)
+            PREV_TARGET_Q = target_q
+            PREV_TARGET_Q_TIME = time.time()
             for motor, id in go2.LegID.items():
                 cmd.motor_cmd[id].q = target_q[id]
                 cmd.motor_cmd[id].dq = 0.0
