@@ -194,10 +194,13 @@ class ModelRunner:
             if self.position_percent > 1.5:
                 self.reached_position = True
             # self.position_percent = min(self.position_percent, 1)
+            self.prev_position_target = np.zeros(12)
+            self.prev_position_target_time = time.time()
             for i in range(12):
                 sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
                 position_percent = min(self.position_percent, 1)
                 self.cmd.motor_cmd[i].q = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
+                self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
                 self.cmd.motor_cmd[i].dq = 0
                 self.cmd.motor_cmd[i].kp = self.Kp
                 self.cmd.motor_cmd[i].kd = self.Kd
@@ -228,10 +231,11 @@ class ModelRunner:
 
         self.prev_position_target = position_targets
         self.prev_position_target_time = time.time()
+        return position_targets
 
     def update_cmd_from_raw_actions(self, output_actions_in_sim):
         position_targets = output_actions_in_sim * control.action_scale + self.default_dof_pos_in_sim
-        self.limit_change_in_position_target(position_targets)
+        position_targets = self.limit_change_in_position_target(position_targets)
 
         for i in range(12):
             q = position_targets[self.state_estimator.joint_idxs_real_to_sim[i]]
