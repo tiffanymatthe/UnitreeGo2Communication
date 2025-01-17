@@ -259,7 +259,7 @@ if __name__ == '__main__':
     runner.start()
 
     try:
-        runner.go_to_position(runner.sit_pos_in_sim)
+        runner.go_to_position(runner.stand_pos_in_sim)
 
         # start model loop
         print(f"Running policy")
