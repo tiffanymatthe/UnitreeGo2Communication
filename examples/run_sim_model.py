@@ -73,12 +73,17 @@ class ModelRunner:
         self.model = None
         self.state_estimator = se.StateEstimator()
 
+        self.delayed = False
+        self.position_start_delay = None
+
         self.Kp = control.stiffness["joint"]
         self.Kd = control.damping["joint"]
         self.publisher_frequency = publisher_frequency
         # in real joint order
         sit_pos_in_real = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
+        stand_pos_in_real = np.array([0.1,0.8,-1.5,-0.1,0.8,-1.5,0.1,1,-1.5,-0.1,1,-1.5])
         # in sim order
+        self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
         self.sit_pos_in_sim = sit_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
         self.default_dof_pos_in_sim = self.sit_pos_in_sim # used in unitree_rl_gym for initialization
         self.cmd_mode = CmdMode.NONE
@@ -124,6 +129,8 @@ class ModelRunner:
 
     def go_to_position(self, target_position_in_sim):
         self.reached_position = False
+        self.position_start_delay = None
+        self.delayed = False
         self.position_percent = 0
         self.start_position_in_sim = self.state_estimator.get_dof_pos_in_sim()
         print(self.start_position_in_sim)
@@ -157,10 +164,13 @@ class ModelRunner:
                                         self.actions
                                         ),dim=-1)
         """
+        body_ang_vel = self.state_estimator.get_body_angular_vel()
+        grav_vec = self.state_estimator.get_gravity_vector()
+        # print(f"body ang vel and grav vec: {body_ang_vel} and {grav_vec}")
         obs = np.concatenate(
             (
-                self.state_estimator.get_body_angular_vel() * 0, # normalization.obs_scales.ang_vel,
-                self.state_estimator.get_gravity_vector() * 0,
+                body_ang_vel * 0, # normalization.obs_scales.ang_vel,
+                grav_vec * 0,
                 (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
                 self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
             )
@@ -192,7 +202,12 @@ class ModelRunner:
         elif self.cmd_mode == CmdMode.TO_POSITION:
             self.position_percent += 1 / self.duration_s / self.publisher_frequency
             if self.position_percent > 1.5:
-                self.reached_position = True
+                if self.delayed and time.time() - self.position_start_delay > 15:
+                    self.reached_position = True
+                    print("REACHED POSITION")
+                if not self.delayed:
+                    self.delayed = True
+                    self.position_start_delay = time.time()
             # self.position_percent = min(self.position_percent, 1)
             self.prev_position_target = np.zeros(12)
             self.prev_position_target_time = time.time()
@@ -219,7 +234,8 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        self.pub.Write(self.cmd)
+        if self.cmd_mode != CmdMode.POLICY:
+            self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
         # print(f"Before limiting joint changes: {position_targets}")
@@ -250,12 +266,12 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/model_500.pt" #50_single_joint_rl_test.pt"
+    model_path = "models/Standing_model_w_rand_start.pt" # "models/model_500.pt" #50_single_joint_rl_test.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
     try:
-        runner.go_to_position(runner.sit_pos_in_sim)
+        runner.go_to_position(runner.stand_pos_in_sim)
 
         # start model loop
         print(f"Running policy")
