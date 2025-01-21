@@ -79,13 +79,16 @@ class ModelRunner:
         self.Kp = control.stiffness["joint"]
         self.Kd = control.damping["joint"]
         self.publisher_frequency = publisher_frequency
-        # in real joint order
+        # from go2_config in unitree_rl_gym
+        stand_pos_in_real = np.array([0.1, 0.8, -1.5, -0.1, 0.8, -1.5, 0.1, 1, -1.5, -0.1, 1, -1.5])
+        # in real joint order, from eppl-erau-db/go2_rl_ws repo
         sit_pos_in_real = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
         stand_pos_in_real = np.array([0.1,0.8,-1.5,-0.1,0.8,-1.5,0.1,1,-1.5,-0.1,1,-1.5])
         # in sim order
         self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
         self.sit_pos_in_sim = sit_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
-        self.default_dof_pos_in_sim = self.sit_pos_in_sim # used in unitree_rl_gym for initialization
+        self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
+        self.default_dof_pos_in_sim = self.stand_pos_in_sim # self.sit_pos_in_sim # used in unitree_rl_gym for initialization
         self.cmd_mode = CmdMode.NONE
         self.raw_actions_in_sim = None
         self.start_position_in_sim = None
