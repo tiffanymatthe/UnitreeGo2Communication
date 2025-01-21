@@ -80,13 +80,20 @@ class ModelRunner:
         self.Kd = control.damping["joint"]
         self.publisher_frequency = publisher_frequency
         # from go2_config in unitree_rl_gym
-        stand_pos_in_real = np.array([0.1, 0.8, -1.5, -0.1, 0.8, -1.5, 0.1, 1, -1.5, -0.1, 1, -1.5])
+        # FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2 # mapping in real
+        # FL_0,RL_0,FR_0,RR_0,FL_1,RL_1,FR_1,RR_1,FL_2,RL_2,FR_2,RR_2 # mapping ordered in go config
+        go2config_to_real = np.array([2,6,10,0,4,8,3,7,11,1,5,9])
+        stand_pos_in_go2config = np.array([0.1,0.1,-0.1,-0.1,0.8,1,0.8,1,-1.5,-1.5,-1.5,-1.5])
+        stand_pos_in_real = stand_pos_in_go2config[go2config_to_real]
+        # print(f"expected stand pos in real: {stand_pos_in_real}")
         # in real joint order, from eppl-erau-db/go2_rl_ws repo
+        # stand_pos_in_real = np.array([0.0, 1.1, -1.8, 0.0, 1.1, -1.8, 0.0, 1.1, -1.8, 0.0, 1.1, -1.8])
         sit_pos_in_real = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
         # in sim order
         self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
         self.sit_pos_in_sim = sit_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
-        self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
+        # self.stand_pos_in_sim = [
+        #     -0.00937855,0.79622251, -1.54836452,0.00190008,0.81039238, -1.52465343, 0.01951134,0.77347863,-1.51487517,-0.032682,0.78465098, -1.50438571]
         self.default_dof_pos_in_sim = self.stand_pos_in_sim # self.sit_pos_in_sim # used in unitree_rl_gym for initialization
         self.cmd_mode = CmdMode.NONE
         self.raw_actions_in_sim = None
@@ -236,8 +243,8 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        if self.cmd_mode != CmdMode.POLICY:
-            self.pub.Write(self.cmd)
+        # if self.cmd_mode != CmdMode.POLICY:
+        self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
         # print(f"Before limiting joint changes: {position_targets}")
