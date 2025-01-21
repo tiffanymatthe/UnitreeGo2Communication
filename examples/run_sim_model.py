@@ -83,7 +83,6 @@ class ModelRunner:
         stand_pos_in_real = np.array([0.1, 0.8, -1.5, -0.1, 0.8, -1.5, 0.1, 1, -1.5, -0.1, 1, -1.5])
         # in real joint order, from eppl-erau-db/go2_rl_ws repo
         sit_pos_in_real = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
-        stand_pos_in_real = np.array([0.1,0.8,-1.5,-0.1,0.8,-1.5,0.1,1,-1.5,-0.1,1,-1.5])
         # in sim order
         self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
         self.sit_pos_in_sim = sit_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
@@ -172,8 +171,8 @@ class ModelRunner:
         # print(f"body ang vel and grav vec: {body_ang_vel} and {grav_vec}")
         obs = np.concatenate(
             (
-                body_ang_vel * 0, # normalization.obs_scales.ang_vel,
-                grav_vec * 0,
+                body_ang_vel * normalization.obs_scales.ang_vel,
+                grav_vec,
                 (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
                 self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
             )
