@@ -210,13 +210,13 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].tau = 0.0
         elif self.cmd_mode == CmdMode.TO_POSITION:
             self.position_percent += 1 / self.duration_s / self.publisher_frequency
-            if self.position_percent > 1.5:
-                if self.delayed and time.time() - self.position_start_delay > 15:
-                    self.reached_position = True
-                    print("REACHED POSITION")
-                if not self.delayed:
-                    self.delayed = True
-                    self.position_start_delay = time.time()
+            if self.position_percent > 1: #.5:
+                # if self.delayed and time.time() - self.position_start_delay > 15:
+                self.reached_position = True
+                print("REACHED POSITION")
+                #if not self.delayed:
+                 #   self.delayed = True
+                  #  self.position_start_delay = time.time()
             # self.position_percent = min(self.position_percent, 1)
             self.prev_position_target = np.zeros(12)
             self.prev_position_target_time = time.time()
@@ -226,8 +226,8 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].q = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
                 self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
                 self.cmd.motor_cmd[i].dq = 0
-                self.cmd.motor_cmd[i].kp = self.Kp
-                self.cmd.motor_cmd[i].kd = self.Kd
+                self.cmd.motor_cmd[i].kp = 40 # self.Kp
+                self.cmd.motor_cmd[i].kd = 5 # self.Kd
                 self.cmd.motor_cmd[i].tau = 0
         elif self.cmd_mode == CmdMode.POLICY:
             obs = self.get_observations()
