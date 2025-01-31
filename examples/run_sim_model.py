@@ -32,7 +32,7 @@ class normalization:
     clip_observations = 100.
     clip_actions = 100.
 
-class control:
+class RL_control:
     # PD Drive parameters:
     control_type = 'P'
     stiffness = {'joint': 20.}  # [N*m/rad]
@@ -41,6 +41,12 @@ class control:
     action_scale = 0.25
     # decimation: Number of control action updates @ sim DT per policy DT
     decimation = 4
+
+class manual_control:
+    # PD Drive parameters:
+    control_type = 'P'
+    stiffness = {'joint': 40.}  # [N*m/rad]
+    damping = {'joint': 5.}     # [N*m*s/rad]
 
 class ModelRunner:
     def __init__(self, publisher_frequency):
@@ -76,8 +82,6 @@ class ModelRunner:
         self.delayed = False
         self.position_start_delay = None
 
-        self.Kp = control.stiffness["joint"]
-        self.Kd = control.damping["joint"]
         self.publisher_frequency = publisher_frequency
         # from go2_config in unitree_rl_gym
         # FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2 # mapping in real
@@ -85,18 +89,14 @@ class ModelRunner:
         go2config_to_real = np.array([2,6,10,0,4,8,3,7,11,1,5,9])
         stand_pos_in_go2config = np.array([0.1,0.1,-0.1,-0.1,0.8,1,0.8,1,-1.5,-1.5,-1.5,-1.5])
         stand_pos_in_real = stand_pos_in_go2config[go2config_to_real]
-        # print(f"expected stand pos in real: {stand_pos_in_real}")
-        # in real joint order, from eppl-erau-db/go2_rl_ws repo
-        # stand_pos_in_real = np.array([0.0, 1.1, -1.8, 0.0, 1.1, -1.8, 0.0, 1.1, -1.8, 0.0, 1.1, -1.8])
         sit_pos_in_real = np.array([-0.1, 1.1, -2.0, -0.1, 1.1, -2.0, -0.1, 1.1, -2.6, -0.1, 1.1, -2.6])
         # in sim order
         self.stand_pos_in_sim = stand_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
         self.sit_pos_in_sim = sit_pos_in_real[self.state_estimator.joint_idxs_real_to_sim]
-        # self.stand_pos_in_sim = [
-        #     -0.00937855,0.79622251, -1.54836452,0.00190008,0.81039238, -1.52465343, 0.01951134,0.77347863,-1.51487517,-0.032682,0.78465098, -1.50438571]
         self.default_dof_pos_in_sim = self.stand_pos_in_sim # self.sit_pos_in_sim # used in unitree_rl_gym for initialization
+
         self.cmd_mode = CmdMode.NONE
-        self.raw_actions_in_sim = None
+        self.policy_output_actions = None
         self.start_position_in_sim = None
         self.target_position_in_sim = None
         self.reached_position = False
@@ -114,12 +114,18 @@ class ModelRunner:
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
 
     def start(self):
+        '''
+        Starts LowCmdWrite thread that infinitely loops
+        '''
         self.lowCmdWriteThreadPtr = RecurrentThread(
             interval=1/self.publisher_frequency, target=self.LowCmdWrite, name="writebasiccmd"
         )
         self.lowCmdWriteThreadPtr.Start()
 
     def load_pt_model(self, model_path):
+        '''
+        Loads model for policy runs.
+        '''
         print(f"Loading model: {model_path}")
 
         model = actor_critic.ActorCritic(
@@ -137,12 +143,16 @@ class ModelRunner:
         self.model = model
 
     def go_to_position(self, target_position_in_sim):
+        '''
+        Sets start and target positions.
+
+        Loops with some delay until the LowCmdWrite thread reaches the target position.
+        '''
         self.reached_position = False
         self.position_start_delay = None
         self.delayed = False
         self.position_percent = 0
         self.start_position_in_sim = self.state_estimator.get_dof_pos_in_sim()
-        print(self.start_position_in_sim)
         self.target_position_in_sim = target_position_in_sim
         self.cmd_mode = CmdMode.TO_POSITION
         print(f"Starting to go to position in sim: {target_position_in_sim}")
@@ -151,6 +161,11 @@ class ModelRunner:
         print(f"Reached position in sim {target_position_in_sim}")
 
     def run_policy(self):
+        '''
+        Uses loaded policy to output actions.
+
+        Can be interrupted if we go into DAMP or SIT mode (SIT mode transitions to DAMP mode).
+        '''
         runner.state_estimator.run_mode = se.RunMode.NORMAL
         runner.cmd_mode = CmdMode.POLICY
         while True:
@@ -172,10 +187,14 @@ class ModelRunner:
                                         self.dof_vel * self.obs_scales.dof_vel,
                                         self.actions
                                         ),dim=-1)
+
+        Updates self.policy_output_actions
+        - outputted from policy and clipped
+        
+        Returns formatted observation object.
         """
         body_ang_vel = self.state_estimator.get_body_angular_vel()
         grav_vec = self.state_estimator.get_gravity_vector()
-        # print(f"body ang vel and grav vec: {body_ang_vel} and {grav_vec}")
         obs = np.concatenate(
             (
                 body_ang_vel * normalization.obs_scales.ang_vel,
@@ -185,11 +204,11 @@ class ModelRunner:
             )
         )
 
-        if self.raw_actions_in_sim is None:
+        if self.policy_output_actions is None:
             # check ordering
-            self.raw_actions_in_sim = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / control.action_scale
+            self.policy_output_actions = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
 
-        obs = np.concatenate((obs, self.raw_actions_in_sim))
+        obs = np.concatenate((obs, self.policy_output_actions))
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
@@ -197,9 +216,15 @@ class ModelRunner:
         return obs
 
     def LowCmdWrite(self):
+        '''
+        Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
+        '''
         if self.cmd_mode == CmdMode.NONE:
             return
         elif self.cmd_mode == CmdMode.DAMP:
+            '''
+            Sends current motor positions with high damping. Robot should slowly go to floor.
+            '''
             dof_pos_in_sim = self.state_estimator.get_dof_pos_in_sim()
             for i in range(12):
                 sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
@@ -209,15 +234,17 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].kd = 5
                 self.cmd.motor_cmd[i].tau = 0.0
         elif self.cmd_mode == CmdMode.TO_POSITION:
+            '''
+            We continue trying to reach the target position slowly.
+            Interpolats between start and target position.
+            Uses higher kp and kd to go from sit mode to stand mode.
+            No feedback, so assumes target position is reached after some delay.
+            '''
             self.position_percent += 1 / self.duration_s / self.publisher_frequency
-            if self.position_percent > 1: #.5:
-                # if self.delayed and time.time() - self.position_start_delay > 15:
+            if self.position_percent > 1:
                 self.reached_position = True
                 print("REACHED POSITION")
-                #if not self.delayed:
-                 #   self.delayed = True
-                  #  self.position_start_delay = time.time()
-            # self.position_percent = min(self.position_percent, 1)
+            self.position_percent = min(self.position_percent, 1)
             self.prev_position_target = np.zeros(12)
             self.prev_position_target_time = time.time()
             for i in range(12):
@@ -226,16 +253,20 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].q = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
                 self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
                 self.cmd.motor_cmd[i].dq = 0
-                self.cmd.motor_cmd[i].kp = 40 # self.Kp
-                self.cmd.motor_cmd[i].kd = 5 # self.Kd
+                self.cmd.motor_cmd[i].kp = manual_control.stiffness
+                self.cmd.motor_cmd[i].kd = manual_control.damping
                 self.cmd.motor_cmd[i].tau = 0
         elif self.cmd_mode == CmdMode.POLICY:
+            '''
+            Gets current observations and converts to actions through policy.
+            Clips actions as done in sim.
+            '''
             obs = self.get_observations()
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                 output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
-                self.raw_actions_in_sim = output_actions_in_sim[0].detach().numpy()
-                self.update_cmd_from_raw_actions(self.raw_actions_in_sim)
+                self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
+                self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
         else:
@@ -243,23 +274,36 @@ class ModelRunner:
 
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
-        # if self.cmd_mode != CmdMode.POLICY:
         self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
-        # print(f"Before limiting joint changes: {position_targets}")
+        '''
+        Clamps changes in position targets by 30 rad/s.
+        
+        Updates self.prev_position_target and self.prev_position_target_time.
+
+        Returns clamped position_targets.
+        '''
         if self.prev_position_target is not None and self.prev_position_target_time is not None:
             max_angle_change = 30 * np.pi/ 180 * (time.time() - self.prev_position_target_time)
             for i in range(12):
                 position_targets[i] = min(max(position_targets[i], self.prev_position_target[i] - max_angle_change), self.prev_position_target[i] + max_angle_change)
-        # print(f"After limiting joint changes: {position_targets}")
 
         self.prev_position_target = position_targets
         self.prev_position_target_time = time.time()
         return position_targets
 
     def update_cmd_from_raw_actions(self, output_actions_in_sim):
-        position_targets = output_actions_in_sim * control.action_scale + self.default_dof_pos_in_sim
+        '''
+        Updates the cmd with the target actions outputted by a policy trained in simulation.
+        output_actions_in_sim: action vector of size 12, ordered as in sim.
+        Requires scaling by RL_control.action_scale and offset from the default_dof_pos_in_sim.
+
+        Will clamp large changes in actions.
+
+        Rturns nothing, updates self.cmd.
+        '''
+        position_targets = output_actions_in_sim * RL_control.action_scale + self.default_dof_pos_in_sim
         position_targets = self.limit_change_in_position_target(position_targets)
 
         for i in range(12):
@@ -267,15 +311,18 @@ class ModelRunner:
             q = max(min(q, self.joint_limits_in_real_list[i][1]), self.joint_limits_in_real_list[i][0])
             self.cmd.motor_cmd[i].q = q
             self.cmd.motor_cmd[i].dq = 0
-            self.cmd.motor_cmd[i].kp = self.Kp
-            self.cmd.motor_cmd[i].kd = self.Kd
+            self.cmd.motor_cmd[i].kp = RL_control.stiffness
+            self.cmd.motor_cmd[i].kd = RL_control.damping
             self.cmd.motor_cmd[i].tau = 0
 
 if __name__ == '__main__':
 
+    # MODIFY:
+    # default dof position (used in simulation)
+
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/Standing_model_w_rand_start.pt" # "models/model_500.pt" #50_single_joint_rl_test.pt"
+    model_path = "models/Standing_model_w_rand_start.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
