@@ -236,7 +236,7 @@ class ModelRunner:
         '''
         if self.cmd_mode == CmdMode.NONE:
             return
-        elif self.cmd_mode == CmdMode.DAMP or not self.se.allowed_to_run:
+        elif self.cmd_mode == CmdMode.DAMP or not self.state_estimator.allowed_to_run:
             '''
             Sends current motor positions with high damping. Robot should slowly go to floor.
             '''
@@ -268,9 +268,10 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].q = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
                 self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
                 self.cmd.motor_cmd[i].dq = 0
-                self.cmd.motor_cmd[i].kp = manual_control.stiffness
-                self.cmd.motor_cmd[i].kd = manual_control.damping
+                self.cmd.motor_cmd[i].kp = manual_control.stiffness["joint"]
+                self.cmd.motor_cmd[i].kd = manual_control.damping["joint"]
                 self.cmd.motor_cmd[i].tau = 0
+                # print(f"{i} with {self.position_percent}: {self.cmd.motor_cmd[i].q}, {self.cmd.motor_cmd[i].kp}, {self.cmd.motor_cmd[i].kd}")
         elif self.cmd_mode == CmdMode.POLICY:
             '''
             Gets current observations and converts to actions through policy.
@@ -287,7 +288,7 @@ class ModelRunner:
                 print(f"Inference failed. {e}")
         else:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
-
+        
         self.cmd.crc = self.crc.Crc(self.cmd)
         self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
         self.pub.Write(self.cmd)
@@ -327,8 +328,8 @@ class ModelRunner:
             q = max(min(q, self.joint_limits_in_real_list[i][1]), self.joint_limits_in_real_list[i][0])
             self.cmd.motor_cmd[i].q = q
             self.cmd.motor_cmd[i].dq = 0
-            self.cmd.motor_cmd[i].kp = RL_control.stiffness
-            self.cmd.motor_cmd[i].kd = RL_control.damping
+            self.cmd.motor_cmd[i].kp = RL_control.stiffness["joint"]
+            self.cmd.motor_cmd[i].kd = RL_control.damping["joint"]
             self.cmd.motor_cmd[i].tau = 0
 
 if __name__ == '__main__':
@@ -341,6 +342,11 @@ if __name__ == '__main__':
     model_path = "models/model.pt"
     runner.load_pt_model(model_path)
     runner.start()
+
+    while not runner.state_estimator.allowed_to_run:
+        time.sleep(1/runner.publisher_frequency)
+
+    print("STARTING EVERYTHING")
 
     try:
         runner.go_to_position(runner.stand_pos_in_sim)

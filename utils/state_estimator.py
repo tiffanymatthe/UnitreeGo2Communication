@@ -130,6 +130,10 @@ class StateEstimator:
         self.cmd_x = msg.lx
         self.cmd_y = msg.ly
         
+        if not self.allowed_to_run and self.key_state[10][1] == 1:
+            print("UP TRIGGER")
+        if self.allowed_to_run and self.key_state[10][1] == 0:
+            print("DOWN TRIGGER")
         self.allowed_to_run = self.key_state[10][1] == 1
 
     def close(self):
