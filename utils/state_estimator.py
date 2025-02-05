@@ -123,6 +123,10 @@ class StateEstimator:
             print(f"Sitting!")
             self.run_mode = RunMode.SIT
         
+        if not self.allowed_to_run and self.key_state[10][1] == 1:
+            print("UP TRIGGER")
+        if self.allowed_to_run and self.key_state[10][1] == 0:
+            print("DOWN TRIGGER")
         self.allowed_to_run = self.key_state[10][1] == 1
 
     def close(self):
