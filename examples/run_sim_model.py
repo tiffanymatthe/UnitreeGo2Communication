@@ -221,7 +221,7 @@ class ModelRunner:
         '''
         if self.cmd_mode == CmdMode.NONE:
             return
-        elif self.cmd_mode == CmdMode.DAMP:
+        elif self.cmd_mode == CmdMode.DAMP or not self.se.allowed_to_run:
             '''
             Sends current motor positions with high damping. Robot should slowly go to floor.
             '''

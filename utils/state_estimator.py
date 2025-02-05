@@ -35,6 +35,8 @@ class StateEstimator:
         self.body_ang_vel = np.zeros(3)
         self.imu_quat = np.zeros(4)
 
+        self.allowed_to_run = False
+
         self.init_time = time.time()
         self.received_first_legdata = False
 
@@ -120,6 +122,8 @@ class StateEstimator:
         elif self.key_state[8][1] == 1: # key A
             print(f"Sitting!")
             self.run_mode = RunMode.SIT
+        
+        self.allowed_to_run = self.key_state[10][1] == 1
 
     def close(self):
         self.low_state_subscription.Close()
