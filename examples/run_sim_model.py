@@ -135,8 +135,8 @@ class ModelRunner:
         print(f"Loading model: {model_path}")
 
         model = actor_critic.ActorCritic(
-            num_actor_obs=42,
-            num_critic_obs=42,
+            num_actor_obs=45,
+            num_critic_obs=45,
             num_actions=12,
             actor_hidden_dims=[512, 256, 128],
             critic_hidden_dims=[512, 256, 128],
@@ -277,7 +277,7 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            command = np.array([0.1,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+            command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             obs = self.get_observations(command)
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
@@ -339,7 +339,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/Standing_model_w_rand_start.pt"
+    model_path = "models/model.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
