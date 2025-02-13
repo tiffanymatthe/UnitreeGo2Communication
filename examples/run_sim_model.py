@@ -32,6 +32,12 @@ class normalization:
     clip_observations = 100.
     clip_actions = 100.
 
+class commands:
+    class ranges:
+        lin_vel_x = [-1.0, 1.0] # min max [m/s]
+        lin_vel_y = [-1.0, 1.0]   # min max [m/s]
+        ang_vel_yaw = [-1, 1]    # min max [rad/s]
+
 class RL_control:
     # PD Drive parameters:
     control_type = 'P'
@@ -178,7 +184,7 @@ class ModelRunner:
                 self.state_estimator.run_mode = se.RunMode.DAMP
                 runner.cmd_mode = CmdMode.DAMP
 
-    def get_observations(self):
+    def get_observations(self, command):
         """
         From unitree_rl_gym:
             self.obs_buf = torch.cat((  self.base_ang_vel  * self.obs_scales.ang_vel,
@@ -188,6 +194,8 @@ class ModelRunner:
                                         self.actions
                                         ),dim=-1)
 
+        Input: command = [lin_vel_x, lin_vel_y, ang_vel_z]
+
         Updates self.policy_output_actions
         - outputted from policy and clipped
         
@@ -195,10 +203,17 @@ class ModelRunner:
         """
         body_ang_vel = self.state_estimator.get_body_angular_vel()
         grav_vec = self.state_estimator.get_gravity_vector()
+
+        # clip commands to be in range
+        command[0] = np.clip(command[0], commands.ranges.lin_vel_x[0], commands.ranges.lin_vel_x[1])
+        command[1] = np.clip(command[1], commands.ranges.lin_vel_y[0], commands.ranges.lin_vel_y[1])
+        command[2] = np.clip(command[2], commands.ranges.ang_vel_yaw[0], commands.ranges.ang_vel_yaw[1])
+
         obs = np.concatenate(
             (
                 body_ang_vel * normalization.obs_scales.ang_vel,
                 grav_vec,
+                commands * np.array([normalization.obs_scales.lin_vel, normalization.obs_scales.lin_vel, normalization.obs_scales.ang_vel]),
                 (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
                 self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
             )
@@ -262,7 +277,8 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            obs = self.get_observations()
+            command = [0.1,0,0]
+            obs = self.get_observations(command)
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                 output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
