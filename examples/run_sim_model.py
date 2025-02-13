@@ -213,7 +213,7 @@ class ModelRunner:
             (
                 body_ang_vel * normalization.obs_scales.ang_vel,
                 grav_vec,
-                commands * np.array([normalization.obs_scales.lin_vel, normalization.obs_scales.lin_vel, normalization.obs_scales.ang_vel]),
+                command * np.array([normalization.obs_scales.lin_vel, normalization.obs_scales.lin_vel, normalization.obs_scales.ang_vel]),
                 (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
                 self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
             )
@@ -277,7 +277,7 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+            command = np.array([0.1,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             obs = self.get_observations(command)
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
