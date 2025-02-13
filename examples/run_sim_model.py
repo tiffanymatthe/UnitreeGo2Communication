@@ -277,7 +277,7 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            command = [0.1,0,0]
+            command = np.array([0.1,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             obs = self.get_observations(command)
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))

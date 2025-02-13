@@ -35,6 +35,10 @@ class StateEstimator:
         self.body_ang_vel = np.zeros(3)
         self.imu_quat = np.zeros(4)
 
+        self.cmd_x = 0
+        self.cmd_y = 0
+        self.cmd_yaw = 0
+
         self.allowed_to_run = False
 
         self.init_time = time.time()
@@ -122,6 +126,9 @@ class StateEstimator:
         elif self.key_state[8][1] == 1: # key A
             print(f"Sitting!")
             self.run_mode = RunMode.SIT
+
+        self.cmd_x = msg.lx
+        self.cmd_y = msg.ly
         
         if not self.allowed_to_run and self.key_state[10][1] == 1:
             print("UP TRIGGER")
