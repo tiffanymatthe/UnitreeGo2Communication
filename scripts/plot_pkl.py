@@ -13,7 +13,7 @@ with (open(pkl_file, "rb")) as openfile:
     print(f"Number of commands {len(joint_commands)} and states {len(joint_states)}")
     # weird, even in policy mode the states we get is less, definitely need to attach time stamps
     # got the damping mode in policy mode, which is why it is hard to tell.
-    print(len([x for x in joint_commands if x[0] == 2]))
+    # print(len([x for x in joint_commands if x[0] == 2]))
 
 # analyze state, clipped
 
@@ -75,7 +75,7 @@ for i in range(12):
     real_idx = REAL_TO_SIM[i]
     # assume we stop program only after simulation
     # seems like joint commands do not change ... they keep the same as go to position
-    joint_cmd = [cmd[1][real_idx].q for cmd in joint_commands if cmd[0] == 2][0:len(joint_states)]
+    joint_cmd = [cmd[1][real_idx].q for cmd in joint_commands if cmd[0] == 2] #[0:len(joint_states)]
     axs1[i].plot(joint_cmd, label="cmd")
     
     axs1[i].set_title(REAL_JOINT_LABELS[REAL_TO_SIM[i]])

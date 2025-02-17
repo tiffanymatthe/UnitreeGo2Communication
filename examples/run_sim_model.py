@@ -221,8 +221,8 @@ class ModelRunner:
         )
 
         if self.policy_output_actions is None:
-            # check ordering
             self.policy_output_actions = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
+            self.policy_output_actions = np.clip(self.policy_output_actions, -normalization.clip_actions, normalization.clip_actions)
 
         obs = np.concatenate((obs, self.policy_output_actions))
         obs = obs.astype(np.float32).reshape(1, -1)
@@ -272,7 +272,6 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].kp = manual_control.stiffness["joint"]
                 self.cmd.motor_cmd[i].kd = manual_control.damping["joint"]
                 self.cmd.motor_cmd[i].tau = 0
-                # print(f"{i} with {self.position_percent}: {self.cmd.motor_cmd[i].q}, {self.cmd.motor_cmd[i].kp}, {self.cmd.motor_cmd[i].kd}")
         elif self.cmd_mode == CmdMode.POLICY:
             '''
             Gets current observations and converts to actions through policy.
