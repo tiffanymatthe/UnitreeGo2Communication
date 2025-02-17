@@ -111,6 +111,7 @@ class ModelRunner:
 
         self.all_cmds = []
         self.all_obs = []
+        self.all_position_targets = []
 
         self.prev_position_target = None
         self.prev_position_target_time = None
@@ -227,7 +228,7 @@ class ModelRunner:
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
-        self.all_obs.append(obs)
+        self.all_obs.append((time.time(), obs))
         return obs
 
     def LowCmdWrite(self):
@@ -277,7 +278,7 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            command = np.array([0.1,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+            command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             obs = self.get_observations(command)
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
@@ -290,7 +291,11 @@ class ModelRunner:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
         
         self.cmd.crc = self.crc.Crc(self.cmd)
-        self.all_cmds.append((self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
+        if not self.state_estimator.allowed_to_run:
+            self.all_cmds.append((3, copy.copy(self.cmd.motor_cmd)))
+        else:
+            print(self.cmd.motor_cmd[0].q)
+            self.all_cmds.append((time.time(), self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
         self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
@@ -318,10 +323,13 @@ class ModelRunner:
 
         Will clamp large changes in actions.
 
-        Rturns nothing, updates self.cmd.
+        Returns nothing, updates self.cmd.
         '''
+        to_save = [time.time()]
         position_targets = output_actions_in_sim * RL_control.action_scale + self.default_dof_pos_in_sim
+        to_save.append(copy.copy(position_targets))
         position_targets = self.limit_change_in_position_target(position_targets)
+        to_save.append(copy.copy(position_targets))
 
         for i in range(12):
             q = position_targets[self.state_estimator.joint_idxs_real_to_sim[i]]
@@ -364,6 +372,7 @@ if __name__ == '__main__':
     with open('all_cmds_finished.pkl', 'wb') as f:
         pickle.dump(runner.all_cmds, f)
         pickle.dump(runner.all_obs, f)
+        pickle.dump(runner.all_position_targets, f)
     print(f"Saved {len(runner.all_cmds)} commands to 'all_cmds_finished.pkl'.")
 
     # use this to publish consistently: example/go2/low_level/go2_stand_example.py
