@@ -295,7 +295,7 @@ class ModelRunner:
 
     def limit_change_in_position_target(self, position_targets):
         '''
-        Clamps changes in position targets by 30 rad/s.
+        Clamps changes in position targets by 30 deg/s.
         
         Updates self.prev_position_target and self.prev_position_target_time.
 
