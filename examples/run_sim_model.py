@@ -204,7 +204,6 @@ class ModelRunner:
         """
         body_ang_vel = self.state_estimator.get_body_angular_vel()
         grav_vec = self.state_estimator.get_gravity_vector()
-        print(grav_vec)
 
         # clip commands to be in range
         command[0] = np.clip(command[0], commands.ranges.lin_vel_x[0], commands.ranges.lin_vel_x[1])
@@ -236,7 +235,7 @@ class ModelRunner:
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
-        command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+        command = np.array([0.2,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
         if self.cmd_mode == CmdMode.NONE:
             return
@@ -296,7 +295,6 @@ class ModelRunner:
         if not self.state_estimator.allowed_to_run:
             self.all_cmds.append((3, copy.copy(self.cmd.motor_cmd)))
         else:
-            print(self.cmd.motor_cmd[0].q)
             self.all_cmds.append((time.time(), self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
         self.pub.Write(self.cmd)
 
