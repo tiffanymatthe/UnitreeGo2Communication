@@ -302,14 +302,14 @@ class ModelRunner:
 
     def limit_change_in_position_target(self, position_targets):
         '''
-        Clamps changes in position targets by 30 deg/s.
+        Clamps changes in position targets by 90 deg/s.
         
         Updates self.prev_position_target and self.prev_position_target_time.
 
         Returns clamped position_targets.
         '''
         if self.prev_position_target is not None and self.prev_position_target_time is not None:
-            max_angle_change = 30 * np.pi/ 180 * (time.time() - self.prev_position_target_time)
+            max_angle_change = 90 * np.pi/ 180 * (time.time() - self.prev_position_target_time)
             for i in range(12):
                 position_targets[i] = min(max(position_targets[i], self.prev_position_target[i] - max_angle_change), self.prev_position_target[i] + max_angle_change)
 
@@ -330,7 +330,7 @@ class ModelRunner:
         to_save = [time.time()]
         position_targets = output_actions_in_sim * RL_control.action_scale + self.default_dof_pos_in_sim
         to_save.append(copy.copy(position_targets))
-        position_targets = self.limit_change_in_position_target(position_targets)
+        # position_targets = self.limit_change_in_position_target(position_targets)
         to_save.append(copy.copy(position_targets))
 
         for i in range(12):
