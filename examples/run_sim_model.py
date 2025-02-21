@@ -204,6 +204,7 @@ class ModelRunner:
         """
         body_ang_vel = self.state_estimator.get_body_angular_vel()
         grav_vec = self.state_estimator.get_gravity_vector()
+        print(grav_vec)
 
         # clip commands to be in range
         command[0] = np.clip(command[0], commands.ranges.lin_vel_x[0], commands.ranges.lin_vel_x[1])
@@ -235,6 +236,8 @@ class ModelRunner:
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
+        command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+        obs = self.get_observations(command)
         if self.cmd_mode == CmdMode.NONE:
             return
         elif self.cmd_mode == CmdMode.DAMP or not self.state_estimator.allowed_to_run:
@@ -277,8 +280,8 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
-            obs = self.get_observations(command)
+            # command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+            # obs = self.get_observations(command)
             try:
                 output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                 output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
