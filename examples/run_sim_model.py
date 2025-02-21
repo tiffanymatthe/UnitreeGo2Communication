@@ -228,14 +228,14 @@ class ModelRunner:
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
-        self.all_obs.append((time.time(), obs))
+        self.all_obs.append([time.time(), obs])
         return obs
 
     def LowCmdWrite(self):
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
-        command = np.array([0.2,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+        command = np.array([0.4,0.4,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
         if self.cmd_mode == CmdMode.NONE:
             return
@@ -293,9 +293,11 @@ class ModelRunner:
         
         self.cmd.crc = self.crc.Crc(self.cmd)
         if not self.state_estimator.allowed_to_run:
-            self.all_cmds.append((3, copy.copy(self.cmd.motor_cmd)))
+            self.all_cmds.append([time.time(), 3, copy.copy(self.cmd.motor_cmd)])
+            self.all_obs[-1].append(3)
         else:
-            self.all_cmds.append((time.time(), self.cmd_mode, copy.copy(self.cmd.motor_cmd)))
+            self.all_cmds.append([time.time(), self.cmd_mode, copy.copy(self.cmd.motor_cmd)])
+            self.all_obs[-1].append(self.cmd_mode)
         self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):

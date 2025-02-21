@@ -5,7 +5,7 @@ import numpy as np
 REAL_JOINT_LABELS = np.array(["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","RL_0","RL_1","RL_2"])
 REAL_TO_SIM = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
 
-pkl_file = "data/all_cmds_finished_0_1_test.pkl"
+pkl_file = "data/all_cmds_finished_0_2_falls_forward.pkl"
 
 with (open(pkl_file, "rb")) as openfile:
     joint_commands = pickle.load(openfile)
@@ -18,15 +18,16 @@ with (open(pkl_file, "rb")) as openfile:
 # analyze state, clipped
 
 # yaw pitch roll from gyroscope
-angular_velocities = [obs[0][0:3] for obs in joint_states]
-grav_vectors = [obs[0][3:6] for obs in joint_states]
-lin_x_y_yaw_commands = [obs[0][6:9] for obs in joint_states]
-dof_positions = [obs[0][9:9+12] for obs in joint_states]
-dof_velocities = [obs[0][9+12:9+24] for obs in joint_states]
+obs_times = [obs[0] for obs in joint_states]
+angular_velocities = [obs[1][0][0:3] for obs in joint_states]
+grav_vectors = [obs[1][0][3:6] for obs in joint_states]
+lin_x_y_yaw_commands = [obs[1][0][6:9] for obs in joint_states]
+dof_positions = [obs[1][0][9:9+12] for obs in joint_states]
+dof_velocities = [obs[1][0][9+12:9+24] for obs in joint_states]
 # might need to clamp initial one too (yes initial might be way off)
-policy_output_actions = [obs[0][9+24:9+36] for obs in joint_states]
+policy_output_actions = [obs[1][0][9+24:9+36] for obs in joint_states]
 
-print(f"Have we analyzed all observations? Size of an observation: {len(joint_states[0][0])} vs. last index: {9+36}.")
+print(f"Have we analyzed all observations? Size of an observation: {len(joint_states[0][1][0])} vs. last index: {9+36}.")
 
 fig, axs = plt.subplots(3, 2, figsize=(12, 8))
 
