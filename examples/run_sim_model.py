@@ -293,10 +293,10 @@ class ModelRunner:
         
         self.cmd.crc = self.crc.Crc(self.cmd)
         if not self.state_estimator.allowed_to_run:
-            self.all_cmds.append([time.time(), 3, copy.copy(self.cmd.motor_cmd)])
+            self.all_cmds.append([time.time(), 3, copy.deepcopy(self.cmd.motor_cmd)])
             self.all_obs[-1].append(3)
         else:
-            self.all_cmds.append([time.time(), self.cmd_mode, copy.copy(self.cmd.motor_cmd)])
+            self.all_cmds.append([time.time(), self.cmd_mode, copy.deepcopy(self.cmd.motor_cmd)])
             self.all_obs[-1].append(self.cmd_mode)
         self.pub.Write(self.cmd)
 
@@ -332,6 +332,8 @@ class ModelRunner:
         to_save.append(copy.copy(position_targets))
         # position_targets = self.limit_change_in_position_target(position_targets)
         to_save.append(copy.copy(position_targets))
+
+        self.all_position_targets.append(to_save)
 
         for i in range(12):
             q = position_targets[self.state_estimator.joint_idxs_real_to_sim[i]]
