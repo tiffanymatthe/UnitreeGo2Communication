@@ -41,7 +41,7 @@ class commands:
 class RL_control:
     # PD Drive parameters:
     control_type = 'P'
-    stiffness = {'joint': 35.}  # [N*m/rad]
+    stiffness = {'joint': 20.}  # [N*m/rad]
     damping = {'joint': 0.5}     # [N*m*s/rad]
     # action scale: target angle = actionScale * action + defaultAngle
     action_scale = 0.25
@@ -235,7 +235,7 @@ class ModelRunner:
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
-        command = np.array([0.4,0.4,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+        command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
         if self.cmd_mode == CmdMode.NONE:
             return
