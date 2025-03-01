@@ -5,6 +5,7 @@ State Estimator, modified from https://github.com/Teddy-Liao/walk-these-ways-go2
 import time as time
 import numpy as np
 import math
+from collections import deque
 import threading
 import constants.unitree_legged_const as go2
 from scipy.spatial.transform import Rotation as R
@@ -34,6 +35,14 @@ class StateEstimator:
         self.tau_est_in_real = np.zeros(12)
         self.body_ang_vel = np.zeros(3)
         self.imu_quat = np.zeros(4)
+
+        self.buffer_duration = 0.02 * 7  # Duration of the buffer in seconds
+        self.data_frequency = 300  # Data frequency in Hz
+        self.buffer_size = int(self.buffer_duration * self.data_frequency)
+        
+        self.joint_pos_buffer = deque(maxlen=self.buffer_size)
+        self.joint_vel_buffer = deque(maxlen=self.buffer_size)
+        self.time_buffer = deque(maxlen=self.buffer_size)
 
         self.cmd_x = 0
         self.cmd_y = 0
@@ -80,6 +89,19 @@ class StateEstimator:
             gravity_vec_w = np.array([0.0, 0.0, -1.0])  # Gravity vector in world
             gravity_proj = -1 * rotation.apply(gravity_vec_w)
             return gravity_proj
+        
+    def query_closest_joint_pos_and_vel_in_sim(self, query_time):
+        with self.state_lock:
+            if not self.time_buffer:
+                return None, None  # No data available
+
+            closest_time = min(self.time_buffer, key=lambda t: abs(t - query_time))
+            closest_index = self.time_buffer.index(closest_time)
+
+            closest_joint_pos = self.joint_pos_buffer[closest_index][1]
+            closest_joint_vel = self.joint_vel_buffer[closest_index][1]
+
+            return closest_joint_pos[self.joint_idxs_real_to_sim].copy(), closest_joint_vel[self.joint_idxs_real_to_sim].copy()
 
     def get_dof_pos_in_sim(self):
         with self.state_lock:
@@ -97,7 +119,7 @@ class StateEstimator:
         if not self.received_first_legdata:
             self.received_first_legdata = True
             print(f"First legdata: {time.time() - self.init_time}s after initialization.")
-
+        
         with self.state_lock:
             self.joint_pos_in_real = np.array([x.q for x in msg.motor_state])
             self.joint_vel_in_real = np.array([x.dq for x in msg.motor_state])
@@ -115,6 +137,12 @@ class StateEstimator:
                 msg.imu_state.quaternion[2],
                 msg.imu_state.quaternion[3]
             ])
+
+            # Update buffers
+            current_time = time.time()
+            self.joint_pos_buffer.append((current_time, self.joint_pos_in_real.copy()))
+            self.joint_vel_buffer.append((current_time, self.joint_vel_in_real.copy()))
+            self.time_buffer.append(current_time)
 
     def _rc_command_cb(self, msg: WirelessController_):
         for i in range(16):

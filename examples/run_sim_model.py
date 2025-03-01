@@ -83,6 +83,7 @@ class ModelRunner:
             self.cmd.motor_cmd[i].tau = 0
 
         self.model = None
+        self.lin_vel_estimator_model = None
         self.state_estimator = se.StateEstimator()
 
         self.delayed = False
@@ -109,6 +110,8 @@ class ModelRunner:
         self.position_percent = 0
         self.duration_s = 5
 
+        self.hist_len = 6
+
         self.all_cmds = []
         self.all_obs = []
         self.all_position_targets = []
@@ -129,15 +132,15 @@ class ModelRunner:
         )
         self.lowCmdWriteThreadPtr.Start()
 
-    def load_pt_model(self, model_path):
+    def load_pt_model(self, model_path, lin_vel_estimator_path):
         '''
         Loads model for policy runs.
         '''
-        print(f"Loading model: {model_path}")
+        print(f"Loading model: {model_path} and {lin_vel_estimator_path}")
 
         model = actor_critic.ActorCritic(
-            num_actor_obs=45,
-            num_critic_obs=45,
+            num_actor_obs=48,
+            num_critic_obs=48,
             num_actions=12,
             actor_hidden_dims=[512, 256, 128],
             critic_hidden_dims=[512, 256, 128],
@@ -148,6 +151,20 @@ class ModelRunner:
         model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu'))['model_state_dict'])
         model.eval()
         self.model = model
+
+        estimator = actor_critic.ActorCritic(
+            num_actor_obs=48 - 6 + self.hist_len * 2 * 12,
+            num_critic_obs=48 - 6 + self.hist_len * 2 * 12,
+            num_actions=3, # linear velocity x y z
+            actor_hidden_dims=[256, 128],
+            critic_hidden_dims=[256, 128],
+            activation='elu',
+            init_noise_std=1.0
+        )
+        estimator.load_state_dict(torch.load(lin_vel_estimator_path, map_location=torch.device('cpu'))['model_state_dict'])
+        estimator.eval()
+
+        self.lin_vel_estimator_model = estimator
 
     def go_to_position(self, target_position_in_sim):
         '''
@@ -200,7 +217,7 @@ class ModelRunner:
         Updates self.policy_output_actions
         - outputted from policy and clipped
         
-        Returns formatted observation object.
+        Returns formatted observation object for policy.
         """
         body_ang_vel = self.state_estimator.get_body_angular_vel()
         grav_vec = self.state_estimator.get_gravity_vector()
@@ -210,25 +227,53 @@ class ModelRunner:
         command[1] = np.clip(command[1], commands.ranges.lin_vel_y[0], commands.ranges.lin_vel_y[1])
         command[2] = np.clip(command[2], commands.ranges.ang_vel_yaw[0], commands.ranges.ang_vel_yaw[1])
 
+        if self.policy_output_actions is None:
+            self.policy_output_actions = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
+            self.policy_output_actions = np.clip(self.policy_output_actions, -normalization.clip_actions, normalization.clip_actions)
+
+        past_pos = []
+        past_vel = []
+        for i in range(self.hist_len, 0, -1):
+            # 0.02 comes from 50 Hz frequency of training in sim
+            past_dof_pos_in_sim, past_dof_vel_in_sim = self.state_estimator.query_closest_joint_pos_and_vel_in_sim(time.time() - 0.02 * i)
+            past_pos.append((past_dof_pos_in_sim - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos)
+            past_vel.append(past_dof_vel_in_sim * normalization.obs_scales.dof_vel)
+
+        past_pos = np.array(past_pos).ravel()
+        past_vel = np.array(past_vel).ravel()
+
+        # get lin velocity estimator obs first
+        estimator_obs = np.concatenate(
+            (
+                body_ang_vel * normalization.obs_scales.ang_vel,
+                grav_vec,
+                (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
+                self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
+                self.policy_output_actions,
+                past_pos,
+                past_vel
+            )
+        )
+
+        estimated_linear_velocities = self.lin_vel_estimator_model.actor(torch.from_numpy(estimator_obs))[0].detach().numpy()
+
         obs = np.concatenate(
             (
+                estimated_linear_velocities,
                 body_ang_vel * normalization.obs_scales.ang_vel,
                 grav_vec,
                 command * np.array([normalization.obs_scales.lin_vel, normalization.obs_scales.lin_vel, normalization.obs_scales.ang_vel]),
                 (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
                 self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
+                self.policy_output_actions
             )
         )
 
-        if self.policy_output_actions is None:
-            self.policy_output_actions = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
-            self.policy_output_actions = np.clip(self.policy_output_actions, -normalization.clip_actions, normalization.clip_actions)
-
-        obs = np.concatenate((obs, self.policy_output_actions))
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
-        self.all_obs.append([time.time(), obs])
+        self.all_obs.append([time.time(), obs, estimator_obs])
+
         return obs
 
     def LowCmdWrite(self):
