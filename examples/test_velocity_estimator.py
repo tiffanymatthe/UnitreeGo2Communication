@@ -12,6 +12,7 @@ import numpy as np
 import time
 import copy
 import pickle
+import sys
 
 class normalization:
     class obs_scales:
@@ -23,7 +24,7 @@ class normalization:
     clip_observations = 100.
     clip_actions = 100.
 
-def load_estimator_model(model_path, num_obs, device="cuda:0"):
+def load_estimator_model(model_path, num_obs, device="cpu"):
     model = ActorCritic(
             num_actor_obs=num_obs,
             num_critic_obs=num_obs,
@@ -43,9 +44,11 @@ def load_estimator_model(model_path, num_obs, device="cuda:0"):
     for param in model.parameters():
         param.requires_grad = False
 
+    model.eval()
+
     return model
 
-def get_observations(self, state_estimator, prev_dof_pos_in_sim, default_dof_pos_in_sim):
+def get_observations(state_estimator, prev_dof_pos_in_sim, default_dof_pos_in_sim):
     """
     From unitree_rl_gym:
         self.obs_buf = torch.cat((  self.base_ang_vel  * self.obs_scales.ang_vel,
@@ -68,7 +71,8 @@ def get_observations(self, state_estimator, prev_dof_pos_in_sim, default_dof_pos
             state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
         )
     )
-    
+    if prev_dof_pos_in_sim is None:
+        prev_dof_pos_in_sim = state_estimator.get_dof_pos_in_sim()
     # this might be an issue
     policy_output_actions = (prev_dof_pos_in_sim - default_dof_pos_in_sim) / 0.25
 
@@ -81,15 +85,21 @@ def get_observations(self, state_estimator, prev_dof_pos_in_sim, default_dof_pos
     return obs
 
 all_true_lin_velocities = []
+latest_true_lin_velocity = (0,0)
 
 def _load_latest_linear_velocity(msg: SportModeState_):
-    global all_true_lin_velocities
-    print(f"True: {msg.velocity}")
-    all_true_lin_velocities.append(time.time(), msg.velocity)
+    global latest_true_lin_velocity
+    # print(f"True: {msg.velocity}")
+    latest_true_lin_velocity = (time.time(), msg.velocity)
 
 if __name__ == "__main__":
 
-    model_path = None
+    if len(sys.argv)>1:
+        ChannelFactoryInitialize(0, sys.argv[1])
+    else:
+        ChannelFactoryInitialize(0)
+
+    model_path = "/home/fizzer/UnitreeGo2Communication/models/walking_estimator_hist_len_0_no_cmd_model.pt"
     velocity_estimator = load_estimator_model(model_path, num_obs = 48 - 3 - 3)
     
     state_estimator = se.StateEstimator()
@@ -111,13 +121,13 @@ if __name__ == "__main__":
             # get observations and feed into the estimator
             # save data alongside actual linear velocity
             time.sleep(0.02) # matches sim frequency
-
             obs = get_observations(state_estimator, prev_dof_pos_in_sim, default_dof_pos_in_sim)
-            all_obs.append(copy.deepcopy(all_obs))
+            all_obs.append(copy.deepcopy(obs))
             prev_dof_pos_in_sim = state_estimator.get_dof_pos_in_sim()
-            estimated_linear_velocities = velocity_estimator.act_inference(obs)
+            estimated_linear_velocities = velocity_estimator.act_inference(torch.from_numpy(obs))
             print(f"Estimated: {estimated_linear_velocities}")
             all_estimated_lin_velocities.append((time.time(), estimated_linear_velocities))
+            all_true_lin_velocities.append((time.time(), latest_true_lin_velocity))
     except KeyboardInterrupt:
         with open('cmd_est_true_velocities.pkl', 'wb') as f:
             pickle.dump(all_obs, f)
