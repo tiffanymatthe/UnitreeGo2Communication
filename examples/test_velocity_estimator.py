@@ -87,6 +87,9 @@ def get_observations(state_estimator, prev_dof_pos_in_sim, default_dof_pos_in_si
 all_true_lin_velocities = []
 latest_true_lin_velocity = (0,0)
 
+dof_position_history = None
+dof_velocity_history = None
+
 def _load_latest_linear_velocity(msg: SportModeState_):
     global latest_true_lin_velocity
     # print(f"True: {msg.velocity}")
@@ -99,8 +102,10 @@ if __name__ == "__main__":
     else:
         ChannelFactoryInitialize(0)
 
-    model_path = "/home/fizzer/UnitreeGo2Communication/models/walking_estimator_hist_len_0_no_cmd_model.pt"
-    velocity_estimator = load_estimator_model(model_path, num_obs = 48 - 3 - 3)
+    HIST_LEN = 6
+
+    model_path = "/home/fizzer/UnitreeGo2Communication/models/walking_estimator_hist_len_6_no_cmd.pt"
+    velocity_estimator = load_estimator_model(model_path, num_obs = 48 - 3 - 3 + HIST_LEN * 2 * 12)
     
     state_estimator = se.StateEstimator()
 
@@ -122,12 +127,24 @@ if __name__ == "__main__":
             # save data alongside actual linear velocity
             time.sleep(0.02) # matches sim frequency
             obs = get_observations(state_estimator, prev_dof_pos_in_sim, default_dof_pos_in_sim)
+
+            if dof_position_history is None:
+                dof_position_history = torch.from_numpy(obs[:,6:6+12]).repeat(1,HIST_LEN)
+                dof_velocity_history = torch.from_numpy(obs[:,6+12:6+24]).repeat(1,HIST_LEN)
+
+            obs = torch.cat((torch.from_numpy(obs), dof_position_history, dof_velocity_history), dim=1)
+
             all_obs.append(copy.deepcopy(obs))
             prev_dof_pos_in_sim = state_estimator.get_dof_pos_in_sim()
-            estimated_linear_velocities = velocity_estimator.act_inference(torch.from_numpy(obs))
+            estimated_linear_velocities = velocity_estimator.act_inference(obs)
             print(f"Estimated: {estimated_linear_velocities}")
             all_estimated_lin_velocities.append((time.time(), estimated_linear_velocities))
             all_true_lin_velocities.append((time.time(), latest_true_lin_velocity))
+
+            dof_position_history = torch.cat((dof_position_history, obs[:,6:6+12]), dim=1)
+            dof_position_history = dof_position_history[:,12:]
+            dof_velocity_history = torch.cat((dof_velocity_history, obs[:,6+12:6+24]), dim=1)
+            dof_velocity_history = dof_velocity_history[:,12:]
     except KeyboardInterrupt:
         with open('cmd_est_true_velocities.pkl', 'wb') as f:
             pickle.dump(all_obs, f)
