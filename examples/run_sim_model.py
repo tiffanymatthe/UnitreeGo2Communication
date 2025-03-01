@@ -255,6 +255,10 @@ class ModelRunner:
             )
         )
 
+        estimator_obs = estimator_obs.astype(np.float32).reshape(1, -1)
+
+        estimator_obs = np.clip(estimator_obs, -normalization.clip_observations, normalization.clip_observations)
+
         estimated_linear_velocities = self.lin_vel_estimator_model.actor(torch.from_numpy(estimator_obs))[0].detach().numpy()
 
         obs = np.concatenate(
@@ -396,8 +400,9 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/model.pt"
-    runner.load_pt_model(model_path)
+    model_path = "models/walking_model.pt"
+    lin_vel_estimator_path = "/home/fizzer/UnitreeGo2Communication/models/walking_estimator_hist_len_6_no_cmd.pt"
+    runner.load_pt_model(model_path, lin_vel_estimator_path)
     runner.start()
 
     while not runner.state_estimator.allowed_to_run:
