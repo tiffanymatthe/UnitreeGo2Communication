@@ -116,6 +116,8 @@ class ModelRunner:
         self.prev_position_target = None
         self.prev_position_target_time = None
 
+        self.policy_every_5_loops = 0
+
         self.crc = CRC()
 
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
@@ -282,9 +284,13 @@ class ModelRunner:
             # command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             # obs = self.get_observations(command)
             try:
-                output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
-                output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
-                self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
+                if self.policy_every_5_loops == 0:
+                    output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
+                    output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
+                    self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
+                self.policy_every_5_loops -= 1
+                if self.policy_every_5_loops <= 0:
+                    self.policy_every_5_loops = 4
                 self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
