@@ -16,6 +16,8 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import RecurrentThread
 
+WAIT_LOOPS = True
+
 class CmdMode:
     NONE = 0
     TO_POSITION = 1
@@ -284,7 +286,7 @@ class ModelRunner:
             # command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             # obs = self.get_observations(command)
             try:
-                if self.policy_every_5_loops == 0:
+                if self.policy_every_5_loops == 0 or not WAIT_LOOPS:
                     output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                     output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                     self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
@@ -357,7 +359,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/working_bc_model.pt"
+    model_path = "models/model_2000_randomization.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
