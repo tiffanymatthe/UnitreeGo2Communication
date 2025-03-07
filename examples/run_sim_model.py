@@ -239,7 +239,7 @@ class ModelRunner:
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
-        command = np.array([0.4,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+        command = np.array([0.3,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
         if self.cmd_mode == CmdMode.NONE:
             return
@@ -266,6 +266,8 @@ class ModelRunner:
             if self.position_percent > 1:
                 self.reached_position = True
                 print("REACHED POSITION")
+                print(self.cmd_mode)
+                print(self.state_estimator.allowed_to_run)
             self.position_percent = min(self.position_percent, 1)
             self.prev_position_target = np.zeros(12)
             self.prev_position_target_time = time.time()
@@ -359,7 +361,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/bc_rand_2000.pt"
+    model_path = "models/model_bc_rand_env.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
