@@ -16,7 +16,7 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import RecurrentThread
 
-WAIT_LOOPS = True
+WAIT_LOOPS = False
 
 class CmdMode:
     NONE = 0
@@ -239,7 +239,7 @@ class ModelRunner:
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
-        command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+        command = np.array([0.4,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
         if self.cmd_mode == CmdMode.NONE:
             return
@@ -359,7 +359,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=250)
 
-    model_path = "models/model_2000_randomization.pt"
+    model_path = "models/bc_rand_2000.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
