@@ -245,6 +245,7 @@ class ModelRunner:
             self.policy_start_time = time.time()
 
         if time.time() - self.policy_start_time > 5:
+            # print("SWITCHED COMMAND TO FORWARD")
             command = np.array([0.3,0,0])
         else:
             command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
@@ -301,10 +302,9 @@ class ModelRunner:
                     output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                     output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                     self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
-                self.policy_every_5_loops -= 1
                 if self.policy_every_5_loops <= 0:
-                    self.policy_every_5_loops = 4
-                print(self.policy_every_5_loops)
+                    self.policy_every_5_loops = 2
+                self.policy_every_5_loops -= 1
                 self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=200)
 
-    model_path = "models/new_teacher_model_mar_7.pt"
+    model_path = "models/model_bc_rand_env.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
@@ -390,7 +390,6 @@ if __name__ == '__main__':
     with open('all_cmds_finished.pkl', 'wb') as f:
         pickle.dump(runner.all_cmds, f)
         pickle.dump(runner.all_obs, f)
-        pickle.dump(runner.all_position_targets, f)
     print(f"Saved {len(runner.all_cmds)} commands to 'all_cmds_finished.pkl'.")
 
     # use this to publish consistently: example/go2/low_level/go2_stand_example.py
