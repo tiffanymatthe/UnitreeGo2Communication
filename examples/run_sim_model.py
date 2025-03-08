@@ -16,7 +16,7 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import RecurrentThread
 
-WAIT_LOOPS = False
+WAIT_LOOPS = True
 
 class CmdMode:
     NONE = 0
@@ -304,6 +304,7 @@ class ModelRunner:
                 self.policy_every_5_loops -= 1
                 if self.policy_every_5_loops <= 0:
                     self.policy_every_5_loops = 4
+                print(self.policy_every_5_loops)
                 self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
@@ -362,7 +363,7 @@ if __name__ == '__main__':
     # MODIFY:
     # default dof position (used in simulation)
 
-    runner = ModelRunner(publisher_frequency=250)
+    runner = ModelRunner(publisher_frequency=200)
 
     model_path = "models/model_bc_rand_env.pt"
     runner.load_pt_model(model_path)
