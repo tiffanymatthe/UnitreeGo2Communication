@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=200)
 
-    model_path = "models/model_bc_rand_env.pt"
+    model_path = "models/new_teacher_model_mar_7.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
