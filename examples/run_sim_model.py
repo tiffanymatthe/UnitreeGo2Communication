@@ -120,6 +120,8 @@ class ModelRunner:
 
         self.policy_every_5_loops = 0
 
+        self.policy_start_time = None
+
         self.crc = CRC()
 
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
@@ -239,8 +241,16 @@ class ModelRunner:
         '''
         Depending on CmdMode, chooses proper cmd motor output to publish and publishes it to the robot.
         '''
-        command = np.array([0.3,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
+
+        if self.cmd_mode != CmdMode.POLICY:
+            self.policy_start_time = time.time()
+
+        if time.time() - self.policy_start_time > 5:
+            command = np.array([0.3,0,0])
+        else:
+            command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
+
         if self.cmd_mode == CmdMode.NONE:
             return
         elif self.cmd_mode == CmdMode.DAMP or not self.state_estimator.allowed_to_run:
