@@ -19,7 +19,7 @@ JOINT_LIMITS = {
 REAL_JOINT_LABELS = np.array(["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","RL_0","RL_1","RL_2"])
 REAL_TO_SIM = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
 
-pkl_file = "data/all_cmds_finished_fell_stand_mar_7.pkl"
+pkl_file = "data/new_model_standing_fell_delay.pkl"
 
 DOF_POS_OBS_SCALE = 1
 ACTION_SCALE = 0.25
@@ -65,7 +65,7 @@ print(f"Have we analyzed all observations? Size of an observation: {len(joint_st
 
 fig, axs = plt.subplots(4, 2, figsize=(12, 8))
 
-start_index_policy = obs_modes.index(2)
+start_index_policy = obs_modes.index(1)
 end_index_policy = obs_modes.index(3)
 
 axs[0, 0].plot(obs_times[start_index_policy:end_index_policy], angular_velocities[start_index_policy:end_index_policy])
@@ -98,7 +98,7 @@ axs2 = axs2.flatten()
 
 cmd_times = [cmd[0] for cmd in joint_commands]
 cmd_modes = [cmd[1] for cmd in joint_commands]
-start_index_policy_cmd = cmd_modes.index(2)
+start_index_policy_cmd = cmd_modes.index(1)
 end_index_policy_cmd = cmd_modes.index(3)
 
 for i in range(12):
