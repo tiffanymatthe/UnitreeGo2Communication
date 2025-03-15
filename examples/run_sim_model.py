@@ -298,12 +298,14 @@ class ModelRunner:
             # command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
             # obs = self.get_observations(command)
             try:
+                print(self.policy_every_5_loops)
                 if self.policy_every_5_loops == 0 or not WAIT_LOOPS:
                     output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                     output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                     self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
+                    print("Get value from action")
                 if self.policy_every_5_loops <= 0:
-                    self.policy_every_5_loops = 2
+                    self.policy_every_5_loops = 3
                 self.policy_every_5_loops -= 1
                 self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
@@ -365,7 +367,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=200)
 
-    model_path = "models/model_bc_rand_env.pt"
+    model_path = "models/bc_mar_15.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
