@@ -16,7 +16,7 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import RecurrentThread
 
-WAIT_LOOPS = True
+WAIT_LOOPS = False
 
 class CmdMode:
     NONE = 0
@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=200)
 
-    model_path = "models/curr_mar_17/standstill/model.pt"
+    model_path = "models/curr_mar_17/friction/model.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
