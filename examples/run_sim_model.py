@@ -1,9 +1,13 @@
+# python3 -m examples.run_sim_model --command 0.5 0.0 0.0
+
 import torch
 import sys
 import numpy as np
 import time
 import copy
 import pickle
+import argparse
+import os
 
 import constants.unitree_legged_const as go2
 import examples.actor_critic as actor_critic
@@ -113,6 +117,8 @@ class ModelRunner:
 
         self.all_cmds = []
         self.all_obs = []
+
+        self.vel_cmd = np.array([0,0,0])
 
         self.prev_position_target = None
         self.prev_position_target_time = None
@@ -245,8 +251,7 @@ class ModelRunner:
             self.policy_start_time = time.time()
 
         if time.time() - self.policy_start_time > 5:
-            # print("SWITCHED COMMAND TO FORWARD")
-            command = np.array([0,0,0])
+            command = self.vel_cmd
         else:
             command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
         obs = self.get_observations(command)
@@ -295,8 +300,6 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
-            # command = np.array([0,0,0]) # np.array([self.state_estimator.cmd_x, self.state_estimator.cmd_y, 0])
-            # obs = self.get_observations(command)
             try:
                 if self.policy_every_5_loops == 0 or not WAIT_LOOPS:
                     output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
@@ -363,9 +366,38 @@ if __name__ == '__main__':
     # MODIFY:
     # default dof position (used in simulation)
 
-    runner = ModelRunner(publisher_frequency=200)
+    parser = argparse.ArgumentParser(description="Run the simulation model with a specified command.")
+    parser.add_argument(
+        "--command",
+        type=float,
+        nargs=3,
+        default=[0, 0, 0],
+        help="Command array in the format [lin_vel_x, lin_vel_y, ang_vel_z]. Default is [0, 0, 0]."
+    )
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        required=True,
+        help="Path to the model file to load."
+    )
 
-    model_path = "models/curr_mar_23/model_dagger_delay.pt"
+    # Parse arguments
+    args = parser.parse_args()
+    command = np.array(args.command)
+
+    # Validate the command values
+    if not np.all((-1.0 <= command) & (command <= 1.0)):
+        raise ValueError(f"Command values must be in the range [-1, 1]. Received: {command}")
+
+    runner = ModelRunner(publisher_frequency=200)
+    runner.vel_cmd = command
+
+    model_path = args.model_path
+
+    # Validate the model path
+    if not os.path.isfile(model_path):
+        raise FileNotFoundError(f"The specified model path does not exist or is not a file: {model_path}")
+
     runner.load_pt_model(model_path)
     runner.start()
 
