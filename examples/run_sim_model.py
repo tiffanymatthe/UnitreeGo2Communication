@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     runner = ModelRunner(publisher_frequency=200)
 
-    model_path = "models/curr_mar_17/friction/model.pt"
+    model_path = "models/curr_mar_23/model_dagger_delay.pt"
     runner.load_pt_model(model_path)
     runner.start()
 
