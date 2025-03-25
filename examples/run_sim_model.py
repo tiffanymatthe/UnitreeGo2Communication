@@ -6,7 +6,7 @@ import numpy as np
 import time
 import copy
 import pickle
-import argparse
+import configparser
 import os
 
 import constants.unitree_legged_const as go2
@@ -366,24 +366,12 @@ if __name__ == '__main__':
     # MODIFY:
     # default dof position (used in simulation)
 
-    parser = argparse.ArgumentParser(description="Run the simulation model with a specified command.")
-    parser.add_argument(
-        "--command",
-        type=float,
-        nargs=3,
-        default=[0, 0, 0],
-        help="Command array in the format [lin_vel_x, lin_vel_y, ang_vel_z]. Default is [0, 0, 0]."
-    )
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        required=True,
-        help="Path to the model file to load."
-    )
+    config = configparser.ConfigParser()
+    config.read('config.txt')
 
-    # Parse arguments
-    args = parser.parse_args()
-    command = np.array(args.command)
+    # Extract command
+    command_str = config.get('DEFAULT', 'command', fallback='0 0 0')
+    command = np.array([float(x) for x in command_str.split()])
 
     # Validate the command values
     if not np.all((-1.0 <= command) & (command <= 1.0)):
@@ -392,7 +380,7 @@ if __name__ == '__main__':
     runner = ModelRunner(publisher_frequency=200)
     runner.vel_cmd = command
 
-    model_path = args.model_path
+    model_path = config.get('DEFAULT', 'model_path', fallback=None)
 
     # Validate the model path
     if not os.path.isfile(model_path):
