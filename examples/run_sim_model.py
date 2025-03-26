@@ -9,6 +9,8 @@ import pickle
 import configparser
 import os
 
+from collections import deque
+
 import constants.unitree_legged_const as go2
 import examples.actor_critic as actor_critic
 import utils.client_utils as client_utils
@@ -94,6 +96,10 @@ class ModelRunner:
         self.delayed = False
         self.position_start_delay = None
 
+        self.buffer_size = np.ceil(0.02 * 200 * 2)
+        self.output_action_buffer = deque(maxlen=self.buffer_size)
+        self.time_buffer = deque(maxlen=self.buffer_size)
+
         self.publisher_frequency = publisher_frequency
         # from go2_config in unitree_rl_gym
         # FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2 # mapping in real
@@ -130,6 +136,12 @@ class ModelRunner:
         self.crc = CRC()
 
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
+
+    def query_closest_output_action(self, query_time):
+        closest_time = min(self.time_buffer, key=lambda t: abs(t - query_time))
+        closest_index = self.time_buffer.index(closest_time)
+        closest_output_action = self.output_action_buffer[closest_index][1]
+        return closest_output_action.copy()
 
     def start(self):
         '''
@@ -231,11 +243,13 @@ class ModelRunner:
             )
         )
 
-        if self.policy_output_actions is None:
-            self.policy_output_actions = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
-            self.policy_output_actions = np.clip(self.policy_output_actions, -normalization.clip_actions, normalization.clip_actions)
+        if not self.output_action_buffer:
+            prev_action_history = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
+            prev_action_history = np.clip(prev_action_history, -normalization.clip_actions, normalization.clip_actions)
+        else:
+            prev_action_history = self.query_closest_output_action(time.time() - 0.02)
 
-        obs = np.concatenate((obs, self.policy_output_actions))
+        obs = np.concatenate((obs, prev_action_history))
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
@@ -305,6 +319,9 @@ class ModelRunner:
                     output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
                     output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                     self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
+                    current_time = time.time()
+                    self.output_action_buffer.append((current_time, self.policy_output_actions.copy()))
+                    self.time_buffer.append(current_time)
                 if self.policy_every_5_loops <= 0:
                     self.policy_every_5_loops = 4
                 self.policy_every_5_loops -= 1
