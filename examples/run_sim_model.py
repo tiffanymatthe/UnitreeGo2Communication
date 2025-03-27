@@ -22,7 +22,7 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.utils.thread import RecurrentThread
 
-WAIT_LOOPS = False
+SIM_DT = 0.02 # 1/50 # seconds
 
 class CmdMode:
     NONE = 0
@@ -96,7 +96,7 @@ class ModelRunner:
         self.delayed = False
         self.position_start_delay = None
 
-        self.buffer_size = np.ceil(0.02 * 200 * 2)
+        self.buffer_size = int(np.ceil(SIM_DT * publisher_frequency * 1.5))
         self.output_action_buffer = deque(maxlen=self.buffer_size)
         self.time_buffer = deque(maxlen=self.buffer_size)
 
@@ -128,8 +128,6 @@ class ModelRunner:
 
         self.prev_position_target = None
         self.prev_position_target_time = None
-
-        self.policy_every_5_loops = 0
 
         self.policy_start_time = None
 
@@ -315,16 +313,12 @@ class ModelRunner:
             Clips actions as done in sim.
             '''
             try:
-                if self.policy_every_5_loops == 0 or not WAIT_LOOPS:
-                    output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
-                    output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
-                    self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
-                    current_time = time.time()
-                    self.output_action_buffer.append((current_time, self.policy_output_actions.copy()))
-                    self.time_buffer.append(current_time)
-                if self.policy_every_5_loops <= 0:
-                    self.policy_every_5_loops = 4
-                self.policy_every_5_loops -= 1
+                output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
+                output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
+                self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
+                current_time = time.time()
+                self.output_action_buffer.append((current_time, self.policy_output_actions.copy()))
+                self.time_buffer.append(current_time)
                 self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
