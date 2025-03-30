@@ -96,7 +96,7 @@ class ModelRunner:
         self.delayed = False
         self.position_start_delay = None
 
-        self.buffer_size = int(np.ceil(SIM_DT * publisher_frequency * 1.5))
+        self.buffer_size = int(np.ceil(SIM_DT * publisher_frequency * 2))
         self.output_action_buffer = deque(maxlen=self.buffer_size)
         self.time_buffer = deque(maxlen=self.buffer_size)
 
@@ -275,9 +275,11 @@ class ModelRunner:
             Sends current motor positions with high damping. Robot should slowly go to floor.
             '''
             dof_pos_in_sim = self.state_estimator.get_dof_pos_in_sim()
+            small_cmd = np.zeros(12)
             for i in range(12):
                 sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
-                self.cmd.motor_cmd[i].q = dof_pos_in_sim[sim_index]
+                small_cmd[i] = dof_pos_in_sim[sim_index]
+                self.cmd.motor_cmd[i].q = small_cmd[i]
                 self.cmd.motor_cmd[i].dq = 0.0
                 self.cmd.motor_cmd[i].kp = 40
                 self.cmd.motor_cmd[i].kd = 5
@@ -298,10 +300,12 @@ class ModelRunner:
             self.position_percent = min(self.position_percent, 1)
             self.prev_position_target = np.zeros(12)
             self.prev_position_target_time = time.time()
+            small_cmd = np.zeros(12)
             for i in range(12):
                 sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
                 position_percent = min(self.position_percent, 1)
-                self.cmd.motor_cmd[i].q = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
+                small_cmd[i] = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
+                self.cmd.motor_cmd[i].q = small_cmd[i]
                 self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
                 self.cmd.motor_cmd[i].dq = 0
                 self.cmd.motor_cmd[i].kp = manual_control.stiffness["joint"]
@@ -319,7 +323,7 @@ class ModelRunner:
                 current_time = time.time()
                 self.output_action_buffer.append((current_time, self.policy_output_actions.copy()))
                 self.time_buffer.append(current_time)
-                self.update_cmd_from_raw_actions(self.policy_output_actions)
+                small_cmd = self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
         else:
@@ -327,10 +331,10 @@ class ModelRunner:
         
         self.cmd.crc = self.crc.Crc(self.cmd)
         if not self.state_estimator.allowed_to_run:
-            self.all_cmds.append([time.time(), 3, copy.deepcopy(self.cmd.motor_cmd)])
+            self.all_cmds.append([time.time(), 3, small_cmd])
             self.all_obs[-1].append(3)
         else:
-            self.all_cmds.append([time.time(), self.cmd_mode, copy.deepcopy(self.cmd.motor_cmd)])
+            self.all_cmds.append([time.time(), self.cmd_mode, small_cmd])
             self.all_obs[-1].append(self.cmd_mode)
         self.pub.Write(self.cmd)
 
@@ -363,14 +367,19 @@ class ModelRunner:
         '''
         position_targets = output_actions_in_sim * RL_control.action_scale + self.default_dof_pos_in_sim
 
+        small_cmd = np.zeros(12)
+
         for i in range(12):
             q = position_targets[self.state_estimator.joint_idxs_real_to_sim[i]]
             q = max(min(q, self.joint_limits_in_real_list[i][1]), self.joint_limits_in_real_list[i][0])
+            small_cmd[i] = q
             self.cmd.motor_cmd[i].q = q
             self.cmd.motor_cmd[i].dq = 0
             self.cmd.motor_cmd[i].kp = RL_control.stiffness["joint"]
             self.cmd.motor_cmd[i].kd = RL_control.damping["joint"]
             self.cmd.motor_cmd[i].tau = 0
+
+        return small_cmd
 
 if __name__ == '__main__':
 
@@ -388,7 +397,7 @@ if __name__ == '__main__':
     if not np.all((-1.0 <= command) & (command <= 1.0)):
         raise ValueError(f"Command values must be in the range [-1, 1]. Received: {command}")
 
-    runner = ModelRunner(publisher_frequency=200)
+    runner = ModelRunner(publisher_frequency=250)
     runner.vel_cmd = command
 
     model_path = config.get('DEFAULT', 'model_path', fallback=None)
