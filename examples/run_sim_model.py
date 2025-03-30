@@ -24,6 +24,8 @@ from unitree_sdk2py.utils.thread import RecurrentThread
 
 SIM_DT = 0.02 # 1/50 # seconds
 
+LOG = False
+
 class CmdMode:
     NONE = 0
     TO_POSITION = 1
@@ -251,7 +253,8 @@ class ModelRunner:
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
-        self.all_obs.append([time.time(), obs])
+        if LOG:
+            self.all_obs.append([time.time(), obs])
         return obs
 
     def LowCmdWrite(self):
@@ -330,12 +333,13 @@ class ModelRunner:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
         
         self.cmd.crc = self.crc.Crc(self.cmd)
-        if not self.state_estimator.allowed_to_run:
-            self.all_cmds.append([time.time(), 3, small_cmd])
-            self.all_obs[-1].append(3)
-        else:
-            self.all_cmds.append([time.time(), self.cmd_mode, small_cmd])
-            self.all_obs[-1].append(self.cmd_mode)
+        if LOG:
+            if not self.state_estimator.allowed_to_run:
+                self.all_cmds.append([time.time(), 3, small_cmd])
+                self.all_obs[-1].append(3)
+            else:
+                self.all_cmds.append([time.time(), self.cmd_mode, small_cmd])
+                self.all_obs[-1].append(self.cmd_mode)
         self.pub.Write(self.cmd)
 
     def limit_change_in_position_target(self, position_targets):
