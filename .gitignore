@@ -1,6 +1,8 @@
 __pycache__/
-ramp_rate_tests_nov_16/*.pkl
 *.pkl
 archived_data/*
 ramp_rate_tests_nov_16/*
 *.pkl
+*.pickle
+*.mp4
+*.zip
