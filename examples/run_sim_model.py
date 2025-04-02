@@ -135,8 +135,6 @@ class ModelRunner:
 
         self.policy_start_time = None
 
-        self.run_policy_ghost_count = 5
-
         self.crc = CRC()
 
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
@@ -319,6 +317,7 @@ class ModelRunner:
                 self.cmd.motor_cmd[i].kp = manual_control.stiffness["joint"]
                 self.cmd.motor_cmd[i].kd = manual_control.damping["joint"]
                 self.cmd.motor_cmd[i].tau = 0
+            
         elif self.cmd_mode == CmdMode.POLICY:
             '''
             Gets current observations and converts to actions through policy.
@@ -336,29 +335,6 @@ class ModelRunner:
                 small_cmd = self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
-
-            if self.run_policy_ghost_count > 0:
-                self.position_percent += 1 / self.duration_s / self.publisher_frequency
-                if self.position_percent > 1:
-                    self.reached_position = True
-                    print("REACHED POSITION")
-                    print(self.cmd_mode)
-                    print(self.state_estimator.allowed_to_run)
-                self.position_percent = min(self.position_percent, 1)
-                self.prev_position_target = np.zeros(12)
-                self.prev_position_target_time = time.time()
-                small_cmd = np.zeros(12)
-                for i in range(12):
-                    sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
-                    position_percent = min(self.position_percent, 1)
-                    small_cmd[i] = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
-                    self.cmd.motor_cmd[i].q = small_cmd[i]
-                    self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
-                    self.cmd.motor_cmd[i].dq = 0
-                    self.cmd.motor_cmd[i].kp = manual_control.stiffness["joint"]
-                    self.cmd.motor_cmd[i].kd = manual_control.damping["joint"]
-                    self.cmd.motor_cmd[i].tau = 0
-                self.run_policy_ghost_count -= 1
         else:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
         
@@ -414,6 +390,17 @@ class ModelRunner:
             self.cmd.motor_cmd[i].tau = 0
 
         return small_cmd
+    
+    def warm_up_policy(self, num_iterations=5):
+        """
+        Performs dummy forward passes with the policy model to reduce initial inference latency.
+        """
+        print(f"Warming up policy model with {num_iterations} iterations...")
+        dummy_obs = torch.zeros((1, 45), dtype=torch.float32).to(device="cuda:0")  # Adjust input size as needed
+        for _ in range(num_iterations):
+            with torch.no_grad():
+                _ = self.model.actor(dummy_obs)
+        print("Policy model warm-up complete.")
 
 if __name__ == '__main__':
 
@@ -441,6 +428,7 @@ if __name__ == '__main__':
         raise FileNotFoundError(f"The specified model path does not exist or is not a file: {model_path}")
 
     runner.load_pt_model(model_path)
+    runner.warm_up_policy(num_iterations=5)  # Perform 5 dummy inferences
     runner.start()
 
     while not runner.state_estimator.allowed_to_run:
