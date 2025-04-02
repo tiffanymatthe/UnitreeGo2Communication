@@ -168,8 +168,9 @@ class ModelRunner:
             init_noise_std=1.0
         )
 
-        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu'))['model_state_dict'])
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cuda:0'))['model_state_dict'])
         model.eval()
+        model = model.to(device="cuda:0")
         self.model = model
 
     def go_to_position(self, target_position_in_sim):
@@ -320,7 +321,11 @@ class ModelRunner:
             Clips actions as done in sim.
             '''
             try:
-                output_actions_in_sim = self.model.actor(torch.from_numpy(obs))
+                print(next(self.model.parameters()).device)
+                policy_input = torch.from_numpy(obs).to(device="cuda:0")
+                print(policy_input.device)
+                output_actions_in_sim = self.model.actor(policy_input).cpu()
+                print("inference finished")
                 output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                 self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
                 current_time = time.time()

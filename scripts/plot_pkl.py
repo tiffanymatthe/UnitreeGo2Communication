@@ -18,7 +18,7 @@ JOINT_LIMITS = {
 
 REAL_JOINT_LABELS = np.array(["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","RL_0","RL_1","RL_2"])
 REAL_TO_SIM = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
-pkl_file = "data/mar_29_stand/mar_29_no_deepcopy_250.pkl"
+pkl_file = "data/mar_29_stand/mar_29_stand_f_50.pkl"
 
 DOF_POS_OBS_SCALE = 1
 ACTION_SCALE = 0.25
@@ -64,7 +64,7 @@ print(f"Have we analyzed all observations? Size of an observation: {len(joint_st
 
 fig, axs = plt.subplots(4, 2, figsize=(12, 8))
 
-start_index_policy = obs_modes.index(2)
+start_index_policy = obs_modes.index(1)
 try:
     end_index_policy = obs_modes.index(3)
 except ValueError:
@@ -74,6 +74,8 @@ time_diffs = np.diff(obs_times[start_index_policy:end_index_policy])
 frequencies = 1 / time_diffs
 average_frequency = np.mean(frequencies)
 print(f"Average frequency of mode 2: {average_frequency} Hz")
+std_dev_frequency = np.std(frequencies)
+print(f"Standard deviation of frequency of mode 2: {std_dev_frequency} Hz")
 
 
 axs[0, 0].plot(obs_times[start_index_policy:end_index_policy], angular_velocities[start_index_policy:end_index_policy])
