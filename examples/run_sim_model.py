@@ -24,7 +24,7 @@ from unitree_sdk2py.utils.thread import RecurrentThread
 
 SIM_DT = 0.02 # 1/50 # seconds
 
-LOG = False
+LOG = True
 
 class CmdMode:
     NONE = 0
@@ -298,7 +298,7 @@ class ModelRunner:
             No feedback, so assumes target position is reached after some delay.
             '''
             self.position_percent += 1 / self.duration_s / self.publisher_frequency
-            if self.position_percent > 1:
+            if self.position_percent > 1.5:
                 self.reached_position = True
                 print("REACHED POSITION")
                 print(self.cmd_mode)
@@ -418,7 +418,7 @@ if __name__ == '__main__':
     if not np.all((-1.0 <= command) & (command <= 1.0)):
         raise ValueError(f"Command values must be in the range [-1, 1]. Received: {command}")
 
-    runner = ModelRunner(publisher_frequency=200)
+    runner = ModelRunner(publisher_frequency=50)
     runner.vel_cmd = command
 
     model_path = config.get('DEFAULT', 'model_path', fallback=None)
