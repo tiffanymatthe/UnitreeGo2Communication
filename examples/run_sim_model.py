@@ -251,13 +251,16 @@ class ModelRunner:
         command[1] = np.clip(command[1], commands.ranges.lin_vel_y[0], commands.ranges.lin_vel_y[1])
         command[2] = np.clip(command[2], commands.ranges.ang_vel_yaw[0], commands.ranges.ang_vel_yaw[1])
 
+        current_dof_pos = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos
+        current_dof_vel = self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel
+
         obs = np.concatenate(
             (
                 body_ang_vel * normalization.obs_scales.ang_vel,
                 grav_vec,
                 command * np.array([normalization.obs_scales.lin_vel, normalization.obs_scales.lin_vel, normalization.obs_scales.ang_vel]),
-                (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
-                self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel,
+                current_dof_pos,
+                current_dof_vel,
             )
         )
 
@@ -268,10 +271,15 @@ class ModelRunner:
             prev_action_history = self.query_closest_output_action(time.time() - 0.02)
 
         if not self.past_dof_pos_buffer:
-            prev_dof_pos_history = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
-            prev_dof_vel_history = self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel
+            prev_dof_pos_history = current_dof_pos
+            prev_dof_vel_history = current_dof_vel
         else:
             prev_dof_pos_history, prev_dof_vel_history = self.query_closest_dofs(time.time() - 0.02)
+
+        current_time = time.time()
+
+        self.past_dof_pos_buffer.append((current_time, current_dof_pos.copy()))
+        self.past_dof_vel_buffer.append((current_time, current_dof_vel.copy()))
 
         obs = np.concatenate((obs, prev_action_history, prev_dof_pos_history, prev_dof_vel_history))
         obs = obs.astype(np.float32).reshape(1, -1)
