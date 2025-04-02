@@ -26,6 +26,8 @@ SIM_DT = 0.02 # 1/50 # seconds
 
 LOG = True
 
+OBS_SIZE = 45 + 12*2
+
 class CmdMode:
     NONE = 0
     TO_POSITION = 1
@@ -100,6 +102,9 @@ class ModelRunner:
 
         self.buffer_size = int(np.ceil(SIM_DT * publisher_frequency * 2))
         self.output_action_buffer = deque(maxlen=self.buffer_size)
+        self.past_dof_pos_buffer = deque(maxlen=self.buffer_size)
+        self.past_dof_vel_buffer = deque(maxlen=self.buffer_size)
+        self.dof_time_buffer = deque(maxlen=self.buffer_size)
         self.time_buffer = deque(maxlen=self.buffer_size)
 
         self.publisher_frequency = publisher_frequency
@@ -143,7 +148,17 @@ class ModelRunner:
         closest_time = min(self.time_buffer, key=lambda t: abs(t - query_time))
         closest_index = self.time_buffer.index(closest_time)
         closest_output_action = self.output_action_buffer[closest_index][1]
-        return closest_output_action.copy()
+
+        return closest_output_action
+    
+
+    def query_closest_dofs(self, query_time):
+        closest_dof_time = min(self.dof_time_buffer, key=lambda t: abs(t - query_time))
+        closest_dof_index = self.dof_time_buffer.index(closest_dof_time)
+        closest_dof_pos = self.past_dof_pos_buffer[closest_dof_index][1]
+        closest_dof_vel = self.past_dof_vel_buffer[closest_dof_index][1]
+
+        return closest_dof_pos, closest_dof_vel
 
     def start(self):
         '''
@@ -161,8 +176,8 @@ class ModelRunner:
         print(f"Loading model: {model_path}")
 
         model = actor_critic.ActorCritic(
-            num_actor_obs=45,
-            num_critic_obs=45,
+            num_actor_obs=OBS_SIZE,
+            num_critic_obs=OBS_SIZE,
             num_actions=12,
             actor_hidden_dims=[512, 256, 128],
             critic_hidden_dims=[512, 256, 128],
@@ -252,7 +267,13 @@ class ModelRunner:
         else:
             prev_action_history = self.query_closest_output_action(time.time() - 0.02)
 
-        obs = np.concatenate((obs, prev_action_history))
+        if not self.past_dof_pos_buffer:
+            prev_dof_pos_history = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) * normalization.obs_scales.dof_pos,
+            prev_dof_vel_history = self.state_estimator.get_dof_vel_in_sim() * normalization.obs_scales.dof_vel
+        else:
+            prev_dof_pos_history, prev_dof_vel_history = self.query_closest_dofs(time.time() - 0.02)
+
+        obs = np.concatenate((obs, prev_action_history, prev_dof_pos_history, prev_dof_vel_history))
         obs = obs.astype(np.float32).reshape(1, -1)
 
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
@@ -326,7 +347,8 @@ class ModelRunner:
             self.policy_times.append(time.time())
             try:
                 policy_input = torch.from_numpy(obs).to(device="cuda:0")
-                output_actions_in_sim = self.model.actor(policy_input).cpu()
+                with torch.no_grad():
+                    output_actions_in_sim = self.model.actor(policy_input).cpu()
                 output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                 self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
                 current_time = time.time()
@@ -396,7 +418,7 @@ class ModelRunner:
         Performs dummy forward passes with the policy model to reduce initial inference latency.
         """
         print(f"Warming up policy model with {num_iterations} iterations...")
-        dummy_obs = torch.zeros((1, 45), dtype=torch.float32).to(device="cuda:0")  # Adjust input size as needed
+        dummy_obs = torch.zeros((1, OBS_SIZE), dtype=torch.float32).to(device="cuda:0")  # Adjust input size as needed
         for _ in range(num_iterations):
             with torch.no_grad():
                 _ = self.model.actor(dummy_obs)
