@@ -1,3 +1,3 @@
 [DEFAULT]
 command: 0.0 0.0 0.0
-model_path: models/curr_apr_1/flat_com_dr/model.pt
+model_path: models/curr_apr_1/terrain/model.pt
