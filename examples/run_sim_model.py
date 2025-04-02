@@ -280,6 +280,7 @@ class ModelRunner:
 
         self.past_dof_pos_buffer.append((current_time, current_dof_pos.copy()))
         self.past_dof_vel_buffer.append((current_time, current_dof_vel.copy()))
+        self.dof_time_buffer.append(time.time())
 
         obs = np.concatenate((obs, prev_action_history, prev_dof_pos_history, prev_dof_vel_history))
         obs = obs.astype(np.float32).reshape(1, -1)
