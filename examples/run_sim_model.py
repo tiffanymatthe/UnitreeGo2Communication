@@ -123,6 +123,8 @@ class ModelRunner:
         self.position_percent = 0
         self.duration_s = 5
 
+        self.policy_times = []
+
         self.all_cmds = []
         self.all_obs = []
 
@@ -320,12 +322,10 @@ class ModelRunner:
             Gets current observations and converts to actions through policy.
             Clips actions as done in sim.
             '''
+            self.policy_times.append(time.time())
             try:
-                print(next(self.model.parameters()).device)
                 policy_input = torch.from_numpy(obs).to(device="cuda:0")
-                print(policy_input.device)
                 output_actions_in_sim = self.model.actor(policy_input).cpu()
-                print("inference finished")
                 output_actions_in_sim = torch.clamp(output_actions_in_sim, -normalization.clip_actions, normalization.clip_actions)
                 self.policy_output_actions = output_actions_in_sim[0].detach().numpy()
                 current_time = time.time()
@@ -406,7 +406,7 @@ if __name__ == '__main__':
     if not np.all((-1.0 <= command) & (command <= 1.0)):
         raise ValueError(f"Command values must be in the range [-1, 1]. Received: {command}")
 
-    runner = ModelRunner(publisher_frequency=250)
+    runner = ModelRunner(publisher_frequency=200)
     runner.vel_cmd = command
 
     model_path = config.get('DEFAULT', 'model_path', fallback=None)
@@ -430,6 +430,15 @@ if __name__ == '__main__':
         print(f"Running policy")
         runner.run_policy()
     except KeyboardInterrupt:
+        # Calculate average frequency from obs_times
+        time_diffs = np.diff(runner.policy_times)
+        frequencies = 1 / time_diffs
+        average_frequency = np.mean(frequencies)
+        print(f"Average frequency: {average_frequency} Hz")
+        # Calculate standard deviation of frequency
+        std_dev_frequency = np.std(frequencies)
+        print(f"Standard deviation of frequency: {std_dev_frequency} Hz")
+
         print("Program interrupted! Saving all_cmds to 'all_cmds.pkl'.")
         with open('all_cmds.pkl', 'wb') as f:
             pickle.dump(runner.all_cmds, f)
