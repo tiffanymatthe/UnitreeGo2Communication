@@ -18,7 +18,7 @@ JOINT_LIMITS = {
 
 REAL_JOINT_LABELS = np.array(["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","RL_0","RL_1","RL_2"])
 REAL_TO_SIM = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
-pkl_file = "data/mar_29_stand/mar_29_stand_f_50.pkl"
+pkl_file = "data/apr_1/cuda_stand.pkl"
 
 DOF_POS_OBS_SCALE = 1
 ACTION_SCALE = 0.25
@@ -64,7 +64,7 @@ print(f"Have we analyzed all observations? Size of an observation: {len(joint_st
 
 fig, axs = plt.subplots(4, 2, figsize=(12, 8))
 
-start_index_policy = obs_modes.index(1)
+start_index_policy = obs_modes.index(2)
 try:
     end_index_policy = obs_modes.index(3)
 except ValueError:
@@ -76,6 +76,8 @@ average_frequency = np.mean(frequencies)
 print(f"Average frequency of mode 2: {average_frequency} Hz")
 std_dev_frequency = np.std(frequencies)
 print(f"Standard deviation of frequency of mode 2: {std_dev_frequency} Hz")
+
+print(time_diffs)
 
 
 axs[0, 0].plot(obs_times[start_index_policy:end_index_policy], angular_velocities[start_index_policy:end_index_policy])
@@ -127,7 +129,7 @@ for i in range(12):
     axs2[i].plot(trimmed_times, slope_of_action * 180 / np.pi, label="slope of action (deg/s)")
 
     real_idx = REAL_TO_SIM[i]
-    joint_cmd = [cmd[2][real_idx].q for cmd in joint_commands]
+    joint_cmd = [cmd[2][real_idx] for cmd in joint_commands]
     trimmed_cmd_times = np.array(cmd_times[start_index_policy_cmd:end_index_policy_cmd]) - obs_times[start_index_policy]
 
     axs1[i].plot(trimmed_cmd_times, joint_cmd[start_index_policy_cmd:end_index_policy_cmd], label="cmd")
