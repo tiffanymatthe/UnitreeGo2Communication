@@ -1,3 +1,3 @@
 [DEFAULT]
 command: 0.0 0.0 0.0
-model_path: models/curr_apr_1/apr_2_no_vel_all/model_700.pt
+model_path: models/curr_apr_2/vel_flat/model.pt
