@@ -451,6 +451,9 @@ if __name__ == '__main__':
         # Calculate standard deviation of frequency
         std_dev_frequency = np.std(frequencies)
         print(f"Standard deviation of frequency: {std_dev_frequency} Hz")
+        if len(time_diffs) > 5:
+            print("Time diffs: ")
+            print(time_diffs[0:5])
 
         print("Program interrupted! Saving all_cmds to 'all_cmds.pkl'.")
         with open('all_cmds.pkl', 'wb') as f:
