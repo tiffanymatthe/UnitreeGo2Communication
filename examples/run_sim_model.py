@@ -303,7 +303,6 @@ class ModelRunner:
                 print("REACHED POSITION")
                 print(self.cmd_mode)
                 print(self.state_estimator.allowed_to_run)
-            self.position_percent = min(self.position_percent, 1)
             self.prev_position_target = np.zeros(12)
             self.prev_position_target_time = time.time()
             small_cmd = np.zeros(12)
