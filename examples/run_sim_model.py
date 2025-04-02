@@ -135,6 +135,8 @@ class ModelRunner:
 
         self.policy_start_time = None
 
+        self.run_policy_ghost_count = 5
+
         self.crc = CRC()
 
         self.joint_limits_in_real_list = list(go2.JOINT_LIMITS.values())
@@ -334,6 +336,29 @@ class ModelRunner:
                 small_cmd = self.update_cmd_from_raw_actions(self.policy_output_actions)
             except Exception as e:
                 print(f"Inference failed. {e}")
+
+            if self.run_policy_ghost_count > 0:
+                self.position_percent += 1 / self.duration_s / self.publisher_frequency
+                if self.position_percent > 1:
+                    self.reached_position = True
+                    print("REACHED POSITION")
+                    print(self.cmd_mode)
+                    print(self.state_estimator.allowed_to_run)
+                self.position_percent = min(self.position_percent, 1)
+                self.prev_position_target = np.zeros(12)
+                self.prev_position_target_time = time.time()
+                small_cmd = np.zeros(12)
+                for i in range(12):
+                    sim_index = self.state_estimator.joint_idxs_real_to_sim[i]
+                    position_percent = min(self.position_percent, 1)
+                    small_cmd[i] = (1 - position_percent) * self.start_position_in_sim[sim_index] + position_percent * self.target_position_in_sim[sim_index]
+                    self.cmd.motor_cmd[i].q = small_cmd[i]
+                    self.prev_position_target[sim_index] = self.cmd.motor_cmd[i].q
+                    self.cmd.motor_cmd[i].dq = 0
+                    self.cmd.motor_cmd[i].kp = manual_control.stiffness["joint"]
+                    self.cmd.motor_cmd[i].kd = manual_control.damping["joint"]
+                    self.cmd.motor_cmd[i].tau = 0
+                self.run_policy_ghost_count -= 1
         else:
             raise NotImplementedError(f"{self.cmd_mode} cmd mode not implemented!")
         
