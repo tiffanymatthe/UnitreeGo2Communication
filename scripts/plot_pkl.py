@@ -18,7 +18,7 @@ JOINT_LIMITS = {
 
 REAL_JOINT_LABELS = np.array(["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","RL_0","RL_1","RL_2"])
 REAL_TO_SIM = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
-pkl_file = "data/apr_1/apr_1_50hz_0_3_m_s.pkl"
+pkl_file = "data/apr_2/real_apr_2/2_rl_0_5.pkl"
 
 DOF_POS_OBS_SCALE = 1
 ACTION_SCALE = 0.25
