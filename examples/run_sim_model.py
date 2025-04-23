@@ -26,7 +26,11 @@ SIM_DT = 0.02 # 1/50 # seconds
 
 LOG = True
 
-OBS_SIZE = 45 + 12*2
+HISTORY_LEN = 3
+ACTION_HISTORY_LEN = 3
+
+# normal observations + action history + pos and vel history
+OBS_SIZE = 36 + 12*ACTION_HISTORY_LEN + 12*HISTORY_LEN*2
 
 class CmdMode:
     NONE = 0
@@ -100,7 +104,7 @@ class ModelRunner:
         self.delayed = False
         self.position_start_delay = None
 
-        self.buffer_size = int(np.ceil(SIM_DT * publisher_frequency * 2))
+        self.buffer_size = int(np.ceil(SIM_DT * publisher_frequency * HISTORY_LEN))
         self.output_action_buffer = deque(maxlen=self.buffer_size)
         self.past_dof_pos_buffer = deque(maxlen=self.buffer_size)
         self.past_dof_vel_buffer = deque(maxlen=self.buffer_size)
@@ -264,17 +268,36 @@ class ModelRunner:
             )
         )
 
+        # history is ordered oldest to newest
+
         if not self.output_action_buffer:
             prev_action_history = (self.state_estimator.get_dof_pos_in_sim() - self.default_dof_pos_in_sim) / RL_control.action_scale
             prev_action_history = np.clip(prev_action_history, -normalization.clip_actions, normalization.clip_actions)
+            prev_action_history = np.tile(prev_action_history, ACTION_HISTORY_LEN)
         else:
-            prev_action_history = self.query_closest_output_action(time.time() - 0.02)
+            prev_action_history = np.concatenate(
+                [
+                    self.query_closest_output_action(time.time() - SIM_DT * (ACTION_HISTORY_LEN - i))
+                    for i in range(ACTION_HISTORY_LEN)
+                ]
+            )
 
         if not self.past_dof_pos_buffer:
             prev_dof_pos_history = current_dof_pos
             prev_dof_vel_history = current_dof_vel
         else:
-            prev_dof_pos_history, prev_dof_vel_history = self.query_closest_dofs(time.time() - 0.02)
+            prev_dof_pos_history = np.concatenate(
+                [
+                    self.query_closest_dofs(time.time() - SIM_DT * (HISTORY_LEN - i))[0]
+                    for i in range(HISTORY_LEN)
+                ]
+            )
+            prev_dof_vel_history = np.concatenate(
+                [
+                    self.query_closest_dofs(time.time() - SIM_DT * (HISTORY_LEN - i))[1]
+                    for i in range(HISTORY_LEN)
+                ]
+            )
 
         current_time = time.time()
 
