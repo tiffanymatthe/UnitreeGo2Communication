@@ -15,6 +15,7 @@ import constants.unitree_legged_const as go2
 import examples.actor_critic as actor_critic
 import utils.client_utils as client_utils
 import utils.state_estimator as se
+from utils.actor import Actor
 
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
@@ -99,6 +100,7 @@ class ModelRunner:
             self.cmd.motor_cmd[i].tau = 0
 
         self.model = None
+        self.vel_estimator = None
         self.state_estimator = se.StateEstimator()
 
         self.delayed = False
@@ -173,11 +175,11 @@ class ModelRunner:
         )
         self.lowCmdWriteThreadPtr.Start()
 
-    def load_pt_model(self, model_path):
+    def load_pt_model(self, model_path, vel_estimator_path):
         '''
         Loads model for policy runs.
         '''
-        print(f"Loading model: {model_path}")
+        print(f"Loading model: {model_path} and velocity estimator {vel_estimator_path}")
 
         model = actor_critic.ActorCritic(
             num_actor_obs=OBS_SIZE,
@@ -193,6 +195,20 @@ class ModelRunner:
         model.eval()
         model = model.to(device="cuda:0")
         self.model = model
+
+        vel_estimator = Actor(
+            num_actor_obs=OBS_SIZE - 6,
+            num_actions=3,
+            actor_hidden_dims=[256, 128],
+            activation='elu',
+            init_noise_std=1.0,
+            noise_std_type="scalar"
+        )
+
+        vel_estimator.load_state_dict(torch.load(vel_estimator_path, map_location=torch.device('cuda:0'))['model_state_dict'])
+        vel_estimator.eval()
+        vel_estimator = vel_estimator.to(device="cuda:0")
+        self.vel_estimator = vel_estimator
 
     def go_to_position(self, target_position_in_sim):
         '''
@@ -306,8 +322,23 @@ class ModelRunner:
         self.dof_time_buffer.append(time.time())
 
         obs = np.concatenate((obs, prev_action_history, prev_dof_pos_history, prev_dof_vel_history))
-        obs = obs.astype(np.float32).reshape(1, -1)
 
+        vel_est_obs = torch.cat((
+            obs[3:9],
+            obs[12:],
+        ),dim=-1)
+
+        vel_est_obs = vel_est_obs.astype(np.float32).reshape(1, -1)
+
+        estimated_lin_vel = self.vel_estimator.act_inference(vel_est_obs)
+
+        # possible concern: if vel_estimator runs too long, observation data is outdated
+        obs = np.concatenate((
+            estimated_lin_vel * self.obs_scales.lin_vel,
+            obs
+        ))
+        
+        obs = obs.astype(np.float32).reshape(1, -1)
         obs = np.clip(obs, -normalization.clip_observations, normalization.clip_observations)
         if LOG:
             self.all_obs.append([time.time(), obs])
@@ -450,9 +481,11 @@ class ModelRunner:
         """
         print(f"Warming up policy model with {num_iterations} iterations...")
         dummy_obs = torch.zeros((1, OBS_SIZE), dtype=torch.float32).to(device="cuda:0")  # Adjust input size as needed
+        dummy_vel_obs = dummy_obs = torch.zeros((1, OBS_SIZE - 6), dtype=torch.float32).to(device="cuda:0")
         for _ in range(num_iterations):
             with torch.no_grad():
                 _ = self.model.actor(dummy_obs)
+                _ = self.vel_estimator.actor(dummy_vel_obs)
         print("Policy model warm-up complete.")
 
 if __name__ == '__main__':
@@ -475,12 +508,16 @@ if __name__ == '__main__':
     runner.vel_cmd = command
 
     model_path = config.get('DEFAULT', 'model_path', fallback=None)
+    vel_est_path = config.get('DEFAULT', 'vel_est_path', fallback=None)
 
     # Validate the model path
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"The specified model path does not exist or is not a file: {model_path}")
+    
+    if not os.path.isfile(vel_est_path):
+        raise FileNotFoundError(f"The specified vel estimator model path does not exist or is not a file: {vel_est_path}")
 
-    runner.load_pt_model(model_path)
+    runner.load_pt_model(model_path, vel_est_path)
     runner.warm_up_policy(num_iterations=5)  # Perform 5 dummy inferences
     runner.start()
 
