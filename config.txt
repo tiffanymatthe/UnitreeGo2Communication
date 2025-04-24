@@ -1,4 +1,4 @@
 [DEFAULT]
 command: 0.5 0.0 0.0
-model_path: models/curr_apr_2/no_dr/model_699.pt
-vel_est_path: models/curr_apr_2/no_dr/model_699.pt
+model_path: models/apr_24/model_2000.pt
+vel_est_path: models/apr_24/state_estimator_model_10.pt
