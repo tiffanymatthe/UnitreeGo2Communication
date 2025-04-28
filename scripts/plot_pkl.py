@@ -18,7 +18,7 @@ JOINT_LIMITS = {
 
 REAL_JOINT_LABELS = np.array(["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","RL_0","RL_1","RL_2"])
 REAL_TO_SIM = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
-pkl_file = "data/apr_2/real_apr_2/2_rl_0_5.pkl"
+pkl_file = "data/apr_24/apr_24_back_0_5.pkl"
 
 DOF_POS_OBS_SCALE = 1
 ACTION_SCALE = 0.25
@@ -51,14 +51,17 @@ print(f"Average frequency: {average_frequency} Hz")
 std_dev_frequency = np.std(frequencies)
 print(f"Standard deviation of frequency: {std_dev_frequency} Hz")
 
+HIST_LEN = 3
+
 obs_modes = [obs[2] if len(obs) > 2 else 0 for obs in joint_states]
-angular_velocities = [obs[1][0][0:3] for obs in joint_states]
-grav_vectors = [obs[1][0][3:6] for obs in joint_states]
-lin_x_y_yaw_commands = [obs[1][0][6:9] for obs in joint_states]
-dof_positions = [obs[1][0][9:9+12] for obs in joint_states]
-dof_velocities = [obs[1][0][9+12:9+24] for obs in joint_states]
+linear_velocities = [obs[1][0][0:3] for obs in joint_states]
+angular_velocities = [obs[1][0][3:6] for obs in joint_states]
+grav_vectors = [obs[1][0][6:9] for obs in joint_states]
+lin_x_y_yaw_commands = [obs[1][0][9:12] for obs in joint_states]
+dof_positions = [obs[1][0][12:12+12] for obs in joint_states]
+dof_velocities = [obs[1][0][12+12:12+24] for obs in joint_states]
 # might need to clamp initial one too (yes initial might be way off)
-policy_output_actions = [obs[1][0][9+24:9+36] for obs in joint_states]
+policy_output_actions = [obs[1][0][36 + (HIST_LEN - 1) * 12:36 + HIST_LEN * 12] for obs in joint_states]
 
 print(f"Have we analyzed all observations? Size of an observation: {len(joint_states[0][1][0])} vs. last index: {9+36}.")
 
@@ -99,6 +102,9 @@ axs[2, 1].plot(obs_times[start_index_policy:end_index_policy], policy_output_act
 axs[2, 1].set_title('Policy Output Actions')
 
 axs[3,0].plot(obs_times[start_index_policy:end_index_policy], obs_modes[start_index_policy:end_index_policy])
+
+axs[3, 1].plot(obs_times[start_index_policy:end_index_policy], linear_velocities[start_index_policy:end_index_policy])
+axs[3, 1].set_title('Linear Velocities')
 
 # try to correlate current positions and actions
 fig1, axs1 = plt.subplots(4, 3, figsize=(12, 8))

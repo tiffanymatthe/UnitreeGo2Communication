@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-real_file = "data/apr_2/real_apr_2/2_rl_0_5.pkl"
-sim_file = "data/apr_2/sim_apr_2/vel_flat_after_bc/Apr02_12-58-31_vel_flat_after_bc_0.5_0_0.pickle"
+real_file = "data/apr_24/apr_24_back_0_5.pkl"
+sim_file = "data/apr_24/Apr23_21-40-49_/Apr23_21-40-49__-0.5_0_0.pickle"
+HIST_LEN = 3
 
 JOINT_LIMITS = {
     "FR_0": [-0.837758,0.837758],
@@ -32,7 +33,9 @@ stand_pos_in_go2config = np.array([0.1,0.1,-0.1,-0.1,0.8,1,0.8,1,-1.5,-1.5,-1.5,
 stand_pos_in_real = stand_pos_in_go2config[go2config_to_real]
 DEFAULT_POS_IN_SIM = stand_pos_in_real[REAL_TO_SIM]
 
-[axs, axs1, axs2] = pickle.load(open("data/apr_2/sim_apr_2/vel_flat_after_bc/Apr02_12-58-31_vel_flat_after_bc_0.5_0_0.pickle", "rb"))
+[axs, axs1, axs2] = pickle.load(open(sim_file, "rb"))
+
+plt.show()
 
 with (open(real_file, "rb")) as openfile:
     joint_commands = pickle.load(openfile)
@@ -40,15 +43,17 @@ with (open(real_file, "rb")) as openfile:
 
 obs_times = [obs[0] for obs in joint_states]
 obs_modes = [obs[2] if len(obs) > 2 else 0 for obs in joint_states]
-angular_velocities = [obs[1][0][0:3] for obs in joint_states]
-grav_vectors = [obs[1][0][3:6] for obs in joint_states]
-lin_x_y_yaw_commands = [obs[1][0][6:9] for obs in joint_states]
-dof_positions = [obs[1][0][9:9+12] for obs in joint_states]
-dof_velocities = [obs[1][0][9+12:9+24] for obs in joint_states]
+linear_velocities = [obs[1][0][0:3] for obs in joint_states]
+angular_velocities = [obs[1][0][3:6] for obs in joint_states]
+grav_vectors = [obs[1][0][6:9] for obs in joint_states]
+lin_x_y_yaw_commands = [obs[1][0][9:12] for obs in joint_states]
+dof_positions = [obs[1][0][12:12+12] for obs in joint_states]
+dof_velocities = [obs[1][0][12+12:12+24] for obs in joint_states]
 # might need to clamp initial one too (yes initial might be way off)
-policy_output_actions = [obs[1][0][9+24:9+36] for obs in joint_states]
+policy_output_actions = [obs[1][0][36 + (HIST_LEN - 1) * 12:36 + HIST_LEN * 12] for obs in joint_states]
 
-start_index_policy = [x[0] for x in lin_x_y_yaw_commands].index(1)
+start_index_policy = next((i for i, x in enumerate(lin_x_y_yaw_commands) if x[0]), None)
+# start_index_policy = [x[0] for x in lin_x_y_yaw_commands].index()
 try:
     end_index_policy = obs_modes.index(3)
 except ValueError:
@@ -245,6 +250,30 @@ for line_idx in range(2):  # Assuming there are two lines (sim and real) for eac
 
     # Adjust layout for the figure
     plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the main title
+
+for ax in axs2:
+    if ax.lines:  # Check if the axis has any plotted data
+        for line in ax.lines:
+            x_data, y_data = line.get_data()
+            trimmed_x_data = [x for x in x_data if x <= obs_times[end_index_policy]]
+            trimmed_y_data = y_data[:len(trimmed_x_data)]
+            line.set_data(trimmed_x_data, trimmed_y_data)
+
+for ax in axs2:
+    if ax.lines:  # Check if the axis has any plotted data
+        x_data = [line.get_data()[0] for line in ax.lines]
+        if x_data:
+            min_x = min([min(data) for data in x_data])
+            max_x = max([max(data) for data in x_data])
+            ax.set_xlim(min_x, max_x)
+
+linear_velocities_labels = ["lin_vel_x", "lin_vel_y", "lin_vel_z"]
+for i in range(3):
+    lin_vels = [x[i] for x in linear_velocities]
+    axs2[i].plot(obs_times[start_index_policy:end_index_policy], lin_vels[start_index_policy:end_index_policy], label="lin vel real", color="red")
+    axs2[i].set_title(linear_velocities_labels[i])
+    axs2[i].legend()
+    
 
 # Show all comparison plots
 # Create a directory to save the plots
